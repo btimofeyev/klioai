@@ -7,9 +7,13 @@ const ChatState = {
 };
 
 // API Service
-const API = {
-    baseUrl: 'http://localhost:3000/api',
+const isDevelopment = window.location.hostname === 'localhost';
+const API_URL = isDevelopment 
+    ? 'http://localhost:3002' 
+    : 'https://klioai.com'; 
 
+const API = {
+    baseUrl: API_URL,
     async request(endpoint, options = {}) {
         try {
             const authToken = localStorage.getItem('authToken');
