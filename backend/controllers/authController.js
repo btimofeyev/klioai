@@ -159,9 +159,23 @@ const authController = {
     async childLogin(req, res) {
         const client = await pool.connect();
         try {
+            // Log incoming request
+            console.log('Child login attempt:', {
+                username: req.body.username,
+                timestamp: new Date().toISOString()
+            });
+    
             await client.query('BEGIN');
             
             const { username, password } = req.body;
+    
+            if (!username || !password) {
+                console.log('Missing credentials');
+                return res.status(400).json({
+                    success: false,
+                    error: 'Username and password are required'
+                });
+            }
     
             // Find child by username
             const query = `
@@ -175,17 +189,20 @@ const authController = {
             `;
             
             const { rows } = await client.query(query, [username]);
-            const child = rows[0];
+            console.log('Query result:', { found: !!rows[0] });
     
-            if (!child) {
+            if (!rows[0]) {
                 return res.status(401).json({
                     success: false,
                     error: 'Invalid username or password'
                 });
             }
     
+            const child = rows[0];
+    
             // Verify password
             const isValidPassword = await bcrypt.compare(password, child.password_hash);
+            console.log('Password verification:', { isValid: isValidPassword });
             
             if (!isValidPassword) {
                 return res.status(401).json({
@@ -202,6 +219,7 @@ const authController = {
             `;
             
             const { rows: [session] } = await client.query(sessionQuery, [child.id]);
+            console.log('Session created:', { sessionId: session.id });
     
             const token = jwt.sign(
                 {
@@ -222,6 +240,8 @@ const authController = {
             );
     
             await client.query('COMMIT');
+    
+            console.log('Login successful:', { childId: child.id, username: child.username });
     
             res.json({
                 success: true,
@@ -244,10 +264,14 @@ const authController = {
             });
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error('Child login error:', error);
-            res.status(400).json({
+            console.error('Child login error:', {
+                error: error.message,
+                stack: error.stack,
+                timestamp: new Date().toISOString()
+            });
+            res.status(500).json({
                 success: false,
-                error: 'Login failed'
+                error: 'An error occurred during login'
             });
         } finally {
             client.release();
