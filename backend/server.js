@@ -85,7 +85,11 @@ app.post('/webhook', express.raw({type: 'application/json'}), async (req, res) =
 
 
 app.use(cors({
-  origin: FRONTEND_URL,
+  origin: [
+    'https://klioai.com',
+    'https://www.klioai.com',
+    'http://localhost:3000'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept']

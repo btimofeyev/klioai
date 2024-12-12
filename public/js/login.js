@@ -1,8 +1,8 @@
 let selectedRole = null;
 const isDevelopment = window.location.hostname === 'localhost';
 const API_URL = isDevelopment 
-    ? 'http://localhost:3002' 
-    : '';
+    ? 'http://localhost:3000' 
+    : '/api';
 const GOOGLE_CLIENT_ID = '459287730958-961bog884pu7h8kr1ir02ifnovbbfire.apps.googleusercontent.com'; 
 
 function initGoogleAuth() {

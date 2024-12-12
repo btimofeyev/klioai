@@ -11,7 +11,7 @@ const ChatState = {
 // API Service
 const API = {
     baseUrl: window.location.hostname === 'localhost'
-        ? 'http://localhost:3002/api'
+        ? 'http://localhost:3000/api'
         : '/api',
     async request(endpoint, options = {}) {
         console.log('API Request Starting:', {
