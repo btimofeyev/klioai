@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klio AI - Parent Dashboard</title>
+    <link rel="icon" href="imgs/logo.png" type="image/x-icon">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/dashboardstyles.css">
+    <link rel="stylesheet" href="css/modalstyles.css">
+    <link rel="stylesheet" href="css/testchat.css">
+    <link rel="stylesheet" href="css/controls.css">
+    <script src="https://js.stripe.com/v3/"></script>
+
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Mobile Menu Toggle -->
+        <button class="mobile-menu-toggle" id="mobileMenuToggle">
+            <i class="fas fa-bars"></i>
+        </button>
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <a href="/index.html">
+                    <img src="/imgs/logo.png" alt="KidSafe Logo" class="logo">
+                </a>
+                <h2>Klio AI</h2>
+            </div>
+            
+            <div class="sidebar-menu">
+                <a href="#children" class="menu-item" data-section="children">
+                    <i class="fas fa-users"></i> Child Accounts
+                </a>
+                <a href="#chats" class="menu-item" data-section="chats">
+                    <i class="fas fa-comments"></i> Chat Monitor
+                </a>
+                <a href="#controls" class="menu-item" data-section="controls">
+                    <i class="fas fa-shield-alt"></i> Parental Controls
+                </a>
+            </div>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-upgrade">
+                    <button class="upgrade-to-pro">
+                        <i class="fas fa-crown"></i>
+                        Upgrade to Pro
+                    </button>
+                </div>
+                <a href="https://billing.stripe.com/p/login/test_4gwbJKfAS4TjfxSfYY" class="btn btn--primary" target="_blank">
+                    Manage Subscription
+                </a>
+                <button id="logoutBtn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+                <button class="close-sidebar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <!-- Dashboard Sections -->
+            <div class="dashboard-sections">
+                <!-- Child Accounts Section -->
+                <section id="children" class="dashboard-section">
+                    <div class="section-header">
+                        <h1>Child Accounts</h1>
+                    </div>
+                    <div id="childrenGrid" class="children-grid">
+                    </div>
+                </section>
+
+                    <!-- Add/Edit Child Modal -->
+                    <div class="modal" id="childModal">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h2 id="modalTitle">Add Child Account</h2>
+                                <button class="close-modal">&times;</button>
+                            </div>
+                            <form id="childForm" class="child-form">
+                                <div class="form-group">
+                                    <label for="childName">Child's Name</label>
+                                    <input type="text" id="childName" name="name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="childAge">Age</label>
+                                    <input type="number" id="childAge" name="age" min="4" max="17" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="childUsername">Username</label>
+                                    <input type="text" id="childUsername" name="username" required>
+                                    <span class="input-hint">This will be used to log in</span>
+                                </div>
+                                <div class="form-group">
+                                    <label for="childPassword">Password</label>
+                                    <div class="password-input">
+                                        <input type="password" id="childPassword" name="password" required>
+                                        <button type="button" class="toggle-password">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Daily Message Limit</label>
+                                    <div class="time-limit-controls">
+                                        <input type="number" id="timeLimit" name="daily_message_limit" 
+                                               min="10" max="200" value="50">
+                                        <span class="unit">messages</span>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Allowed Hours</label>
+                                    <div class="time-range-controls">
+                                        <input type="time" id="startTime" name="allowed_start_time" value="09:00">
+                                        <span>to</span>
+                                        <input type="time" id="endTime" name="allowed_end_time" value="21:00">
+                                    </div>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="primary-btn">Save Child Account</button>
+                                    <button type="button" class="secondary-btn" data-close-modal>Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Placeholder for other sections -->
+                <section id="chats" class="dashboard-section">
+                    <div class="section-header">
+                        <h1>Chat Monitor</h1>
+                        <select id="chatChildFilter" class="child-select">
+                            <option value="">Select a child</option>
+                        </select>
+                    </div>
+                    <div class="tab-navigation">
+                        <button class="tab-button active" data-tab="summaries">Chat Summaries</button>
+                        <button class="tab-button" data-tab="memory">Learning Memory</button>
+                    </div>
+                    <div class="chat-monitor-grid">
+                        <!-- Summaries Section -->
+                        <div class="summaries-container">
+                            <div class="summaries-header">
+
+                            </div>
+                            <div class="topic-pills" id="topicFilter">
+                                <!-- Topic filters will be added dynamically -->
+                            </div>
+                            <div class="summaries-list">
+                                <!-- Summaries will be populated here -->
+                            </div>
+                        </div>
+                
+                        <!-- Memory Section -->
+                        <div class="memory-container">
+                            <div class="memory-header">
+                                <h2>Learning Memory</h2>
+                            </div>
+                            <div id="interestsList" class="interests-list">
+                                <!-- Interests will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="controls" class="dashboard-section">
+                    <div class="controls-container">
+                        <div class="controls-header">
+                            <h1>Parental Controls</h1>
+                            <select id="controlsChildFilter" class="child-select">
+                                <option value="">Select a child</option>
+                            </select>
+                        </div>
+                
+                        <div class="controls-grid">
+                            <!-- Safety Controls -->
+                            <div class="control-card">
+                                <h3><i class="fas fa-shield-alt"></i> Safety Settings</h3>
+                                <p class="control-description">Manage chat safety and content filtering.</p>
+                                 
+                                <div class="control-option">
+                                    <div class="option-label">
+                                        <span class="option-title">Filter Inappropriate Content</span>
+                                        <span class="option-description">Block inappropriate language and content</span>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="filterInappropriate">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                
+                                <div class="control-option">
+                                    <div class="option-label">
+                                        <span class="option-title">Block Personal Information</span>
+                                        <span class="option-description">Prevent sharing of personal details</span>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="blockPersonalInfo">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                
+                            <!-- Time Controls -->
+                            <div class="control-card">
+                                <h3><i class="fas fa-clock"></i> Time Settings</h3>
+                                <p class="control-description">Set message limits and allowed hours.</p>
+                                
+                                <div class="control-option">
+                                    <div class="option-label">
+                                        <span class="option-title">Daily Message Limit</span>
+                                        <span class="option-description">Maximum messages per day</span>
+                                    </div>
+                                    <div class="time-input">
+                                        <select id="messageLimit" class="message-limit-select">
+                                            <option value="50">50 messages</option>
+                                            <option value="100">100 messages</option>
+                                            <option value="200">200 messages</option>
+                                            <option value="999999">Unlimited</option>
+                                        </select>
+                                    </div>
+                                </div>
+                
+                                <div class="control-option">
+                                    <div class="option-label">
+                                        <span class="option-title">Allowed Hours</span>
+                                        <span class="option-description">Set when chat is available</span>
+                                    </div>
+                                    <div class="time-range">
+                                        <input type="time" id="allowedStartTime">
+                                        <span>to</span>
+                                        <input type="time" id="allowedEndTime">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                
+                        <div class="controls-actions">
+                            <button class="primary-btn" id="saveControls">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+    <script src="js/utils.js"></script>
+    <script src="js/childAccounts.js"></script>
+    <script src="js/activityMonitor.js"></script>
+    <script src="js/parentalcontrols.js"></script>
+    <script src="js/mobile-menu.js"></script>
+    <script src="js/dashboard.js"></script>
+
+</body>
+</html>

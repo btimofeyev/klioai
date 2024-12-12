@@ -1,0 +1,196 @@
+.summary-card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    padding: 20px;
+    transition: transform 0.2s;
+}
+
+.summary-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.summary-section {
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    background: #f8f9fa;
+}
+
+/* Topics of Concern Section */
+.concerning-topics {
+    background-color: #fff3f3;
+    border-left: 4px solid #dc3545;
+}
+
+.concerning-topics .topic-tag {
+    background-color: #dc3545;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-right: 5px;
+    font-size: 0.9em;
+}
+
+.concerning-topics .topic-tag i {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.safe-topics {
+    background-color: #f0fff4;
+    border-left: 4px solid #28a745;
+}
+
+.warning-content {
+    margin-top: 10px;
+}
+
+.concern-item {
+    color: #dc3545;
+    padding: 8px;
+    margin: 5px 0;
+    background: rgba(220, 53, 69, 0.1);
+    border-radius: 4px;
+}
+
+.no-concerns {
+    color: #28a745;
+    font-weight: 500;
+}
+
+/* Topics Discussed Section */
+.topics-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.topic-bubble {
+    background: #e9ecef;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.9em;
+    color: #495057;
+}
+
+/* Engagement Level Section */
+.engagement-indicator {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px;
+    border-radius: 6px;
+    margin-top: 10px;
+}
+
+.engagement-indicator.high {
+    background-color: #28a745;
+    color: white;
+}
+
+.engagement-indicator.medium {
+    background-color: #ffc107;
+    color: #000;
+    border: 1px solid #dea806;
+}
+
+.engagement-indicator.low {
+    background-color: #dc3545;
+    color: white;
+}
+
+.engagement-indicator .level {
+    font-weight: bold;
+    padding: 4px 12px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.engagement-indicator .explanation {
+    margin: 0;
+    font-size: 0.95em;
+}
+
+/* Learning Points and Parent Tips Combined Section */
+.summary-section .learning-points,
+.summary-section .parent-tips {
+    margin-top: 10px;
+}
+
+.summary-section ul {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.summary-section .learning-points li {
+    position: relative;
+    padding: 8px 8px 8px 25px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.summary-section .learning-points li:before {
+    content: "•";
+    color: #007bff;
+    font-weight: bold;
+    position: absolute;
+    left: 8px;
+}
+
+.summary-section .parent-tips li {
+    position: relative;
+    padding: 12px 12px 12px 30px;
+    margin: 8px 0;
+    background: #fff;
+    border-radius: 6px;
+    border-left: 3px solid #007bff;
+}
+
+.summary-section .parent-tips li:before {
+    content: "★";
+    color: #007bff;
+    position: absolute;
+    left: 10px;
+    font-size: 1.1em;
+}
+
+/* Section Headers */
+.summary-section h4 {
+    color: #343a40;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1em;
+}
+
+.summary-section h4 i {
+    color: #6c757d;
+    width: 20px;
+    text-align: center;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .summary-card {
+        padding: 15px;
+    }
+
+    .topics-grid {
+        gap: 6px;
+    }
+
+    .topic-bubble {
+        padding: 4px 8px;
+        font-size: 0.8em;
+    }
+
+    .summary-section .parent-tips li {
+        padding: 10px 10px 10px 25px;
+    }
+}

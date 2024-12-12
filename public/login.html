@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klio AI - Login</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/login-styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar__content">
+                <a href="/" class="navbar__logo">
+                    <div class="chat__avatar">
+                        <img src="imgs/logo.png" alt="Klio AI Logo">
+                    </div>
+                </a>
+                <a href="/signup.html" class="btn btn--outline btn--small">Sign Up</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="section-header">
+            <h1 class="section-title">Welcome Back!</h1>
+            <p class="section-subtitle">Please select your account type to continue</p>
+        </div>
+
+        <div class="role-selection">
+            <div class="role-card parent" onclick="selectRole('parent')">
+                <div class="role-icon">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <h2>Parent Account</h2>
+                <p>Access dashboard and manage settings</p>
+                <div class="role-features">
+                    <ul>
+                        <li><i class="fas fa-history"></i> View chat history</li>
+                        <li><i class="fas fa-users-cog"></i> Manage child accounts</li>
+                        <li><i class="fas fa-sliders-h"></i> Control settings</li>
+                        <li><i class="fas fa-chart-line"></i> Monitor activity</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="role-card child" onclick="selectRole('child')">
+                <div class="role-icon">
+                    <i class="fas fa-child"></i>
+                </div>
+                <h2>Child Account</h2>
+                <p>Start chatting with Klio AI</p>
+                <div class="role-features">
+                    <ul>
+                        <li><i class="fas fa-shield-alt"></i> Safe chat environment</li>
+                        <li><i class="fas fa-graduation-cap"></i> Educational conversations</li>
+                        <li><i class="fas fa-smile-beam"></i> Fun interactions</li>
+                        <li><i class="fas fa-puzzle-piece"></i> Learning activities</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Modal -->
+        <div class="modal" id="loginModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Login</h2>
+                    <button class="close-modal" onclick="closeModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="modalContent"></div>
+            </div>
+        </div>
+
+        <!-- Go Back Button -->
+        <div class="additional-options">
+            <p>Don't have an account? <a href="/signup.html">Sign Up</a></p>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/login.js"></script>
+</body>
+</html>

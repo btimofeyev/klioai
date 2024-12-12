@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klio AI Chat</title>
+    <link rel="icon" href="imgs/logo.png" type="image/x-icon">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="css/chat-styles.css">
+    
+</head>
+<body>
+    <div class="chat-container">
+        <header class="chat-header">
+            <div class="user-info">
+                <div class="ai-avatar">
+                    <img src="imgs/logo.png" alt="Klio AI Logo" style="width: 100%; height: 100%; object-fit: contain;">
+                </div>
+                <div>
+                    <h2>Klio AI</h2>
+                    <span id="childName">Loading...</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button id="newConversationBtn">
+                    <i class="fas fa-plus"></i>
+                    <span>New Chat</span>
+                </button>
+                <button id="themeToggleBtn">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <div id="chatArea" class="chat-area">
+            <!-- Messages will appear here -->
+        </div>
+
+        <div class="chat-input-area">
+            <div class="input-wrapper">
+                <input 
+                    type="text" 
+                    id="messageInput" 
+                    placeholder="Type your message here..."
+                    autocomplete="off"
+                >
+                <button id="sendMessageBtn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingIndicator" class="loading-indicator">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+    </div>
+
+    <!-- Scripts -->
+    <script src="js/utils.js"></script>
+
+    <script src="js/chat.js"></script>
+</body>
+</html>

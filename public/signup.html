@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Klio AI - Choose Your Learning Journey</title>
+        <link rel="stylesheet" href="css/styles.css">
+        <link rel="stylesheet" href="css/pricestyles.css">
+        <!-- Add both required scripts -->
+        <script src="https://js.stripe.com/v3/"></script>
+        <script src="https://accounts.google.com/gsi/client" async></script>
+    </head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <div class="navbar__content">
+                <a href="/" class="navbar__logo">
+                    <div class="chat__avatar">
+                        <img src="imgs/logo.png" alt="Klio AI Logo">
+                    </div>
+                </a>
+                <a href="/login.html" class="btn btn--outline btn--small">Log In</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="section-header pricing-header">
+            <h1 class="section-title">Begin Your Learning Adventure</h1>
+            <p class="section-subtitle">Choose the perfect plan for your family's journey with Klio</p>
+        </div>
+
+        <!-- Pricing Grid -->
+        <div class="pricing-grid">
+            <!-- Single Account Plan -->
+            <div class="pricing-card">
+                <div class="pricing-card__header">
+                    <h2 class="plan-name">Single Account Plan</h2>
+                    <div class="plan-price">$9<span>.99/month</span></div>
+                </div>
+                <ul class="features-list">
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        1 Parent Account
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        1 Child Account
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        Safe Learning Environment
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        Basic Parental Controls
+                    </li>
+                    <li class="disabled">
+                        <span class="feature-icon">×</span>
+                        Multiple Child Accounts
+                    </li>
+                    <li class="disabled">
+                        <span class="feature-icon">×</span>
+                        Advanced Learning Analytics
+                    </li>
+                </ul>
+                <button class="btn btn--outline" onclick="showModal('single')">
+                    Start Exploring
+                    <span>→</span>
+                </button>
+            </div>
+
+            <!-- Family Pro Account Plan -->
+            <div class="pricing-card popular">
+                <div class="pricing-card__badge">Most Popular</div>
+                <div class="pricing-card__header">
+                    <h2 class="plan-name">Family Pro Account Plan</h2>
+                    <div class="plan-price">$19<span>.99/month</span></div>
+                </div>
+                <ul class="features-list">
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        1 Parent Dashboard
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        Up to 3 Child Accounts
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        Enhanced Safety Controls
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        Advanced Learning Tools
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        Detailed Progress Tracking
+                    </li>
+                    <li>
+                        <span class="feature-icon">✓</span>
+                        Priority Support 24/7
+                    </li>
+                </ul>
+                <button class="btn btn--primary" onclick="showModal('familypro')">
+                    Start Your Adventure
+                    <span>→</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Additional Options -->
+        <div class="additional-options">
+            <p>Already part of our learning community? <a href="/login" class="text-gradient">Log In</a></p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer__content">
+                <div class="footer__brand">
+                    <div class="chat__avatar">
+                        <img src="imgs/Black & White Minimalist Signature Personal Brand Logo (3).png" alt="Klio AI Logo">
+                    </div>
+                    <p>Fun, Safe, Smart – Just for Kids.</p>
+                </div>
+                <div class="footer__links">
+                    <h3 class="footer__title">Company</h3>
+                    <ul class="footer__list">
+                        <li><a href="#">Features</a></li>
+                        <li><a href="#">Contact Us</a></li>
+                        <li><a href="#">Privacy Policy</a></li>
+                        <li><a href="#">Terms of Use</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer__bottom">
+                2024 Klio AI. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal -->
+    <div class="modal" id="signupModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Join Klio AI</h2>
+                <button class="close-modal" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+    
+</body>
+</html>
