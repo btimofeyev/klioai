@@ -13,32 +13,51 @@ const API = {
         ? 'http://localhost:3000/api'
         : 'https://klioai.com/api',
 
-    async request(endpoint, options = {}) {
-        try {
-            const authToken = localStorage.getItem('authToken');
-            if (!authToken) throw new Error('No authentication token found');
-
-            const response = await fetch(`${this.baseUrl}${endpoint}`, {
-                ...options,
-                headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    ...options.headers,
-                },
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Server error:', errorText);
-                throw new Error(`Request failed: ${response.status}`);
+        async request(endpoint, options = {}) {
+            try {
+                const authToken = localStorage.getItem('authToken');
+                if (!authToken) throw new Error('No authentication token found');
+    
+                const url = `${this.baseUrl}${endpoint}`;
+                console.log('Making request to:', url); // Debug log
+    
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+    
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Server response:', {
+                        status: response.status,
+                        statusText: response.statusText,
+                        body: errorText,
+                        url: response.url
+                    });
+                    throw new Error(`Request failed: ${response.status}`);
+                }
+    
+                const contentType = response.headers.get('content-type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    console.error('Unexpected content type:', contentType);
+                    throw new Error('Server returned non-JSON response');
+                }
+    
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                console.error('Request details:', {
+                    endpoint,
+                    baseUrl: this.baseUrl,
+                    fullUrl: `${this.baseUrl}${endpoint}`
+                });
+                throw error;
             }
-
-            return await response.json();
-        } catch (error) {
-            console.error('API Error:', error);
-            throw error;
-        }
     },
 
     get(endpoint) {
@@ -361,20 +380,24 @@ async function initializeChat() {
         ChatState.childData = userData;
         UI.elements.childName.textContent = userData.name || 'Friend';
 
+        console.log('Making profile request...'); // Debug log
         // Get profile data
         const profileResponse = await API.get('/children/profile');
+        console.log('Profile response:', profileResponse); // Debug log
+
         if (profileResponse.success) {
             ChatState.childData = { ...ChatState.childData, ...profileResponse };
         }
 
+        console.log('Getting active conversation...'); // Debug log
         // Get active conversation or start new one
         const activeResponse = await API.get('/chat/conversation/active');
+        console.log('Active conversation response:', activeResponse); // Debug log
 
         if (!activeResponse.success || !activeResponse.conversation) {
             await EventHandlers.handleNewConversation();
         } else {
             ChatState.conversationId = activeResponse.conversation.id;
-            // Could load conversation history here if needed
         }
 
         ChatState.isInitialized = true;
@@ -382,6 +405,10 @@ async function initializeChat() {
 
     } catch (error) {
         console.error('Initialization error:', error);
+        console.error('Error details:', {
+            message: error.message,
+            stack: error.stack
+        });
         UI.showError('Failed to initialize chat');
         UI.hideLoading();
     }
