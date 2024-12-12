@@ -8,56 +8,48 @@ const ChatState = {
 
 // API Service
 const API = {
-    // Environment-based URL configuration
+    // Match the working configuration from auth.js
     baseUrl: window.location.hostname === 'localhost' 
-        ? 'http://localhost:3000/api'
+        ? 'http://localhost:3002/api' 
         : 'https://klioai.com/api',
 
-        async request(endpoint, options = {}) {
-            try {
-                const authToken = localStorage.getItem('authToken');
-                if (!authToken) throw new Error('No authentication token found');
-    
-                const url = `${this.baseUrl}${endpoint}`;
-                console.log('Making request to:', url); // Debug log
-    
-                const response = await fetch(url, {
-                    ...options,
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json',
-                        ...options.headers,
-                    },
-                });
-    
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Server response:', {
-                        status: response.status,
-                        statusText: response.statusText,
-                        body: errorText,
-                        url: response.url
-                    });
-                    throw new Error(`Request failed: ${response.status}`);
-                }
-    
-                const contentType = response.headers.get('content-type');
-                if (!contentType || !contentType.includes('application/json')) {
-                    console.error('Unexpected content type:', contentType);
-                    throw new Error('Server returned non-JSON response');
-                }
-    
-                return await response.json();
-            } catch (error) {
-                console.error('API Error:', error);
-                console.error('Request details:', {
-                    endpoint,
-                    baseUrl: this.baseUrl,
-                    fullUrl: `${this.baseUrl}${endpoint}`
-                });
-                throw error;
+    async request(endpoint, options = {}) {
+        try {
+            const authToken = localStorage.getItem('authToken');
+            if (!authToken) throw new Error('No authentication token found');
+
+            console.log('Making request to:', `${this.baseUrl}${endpoint}`); // Debug log
+
+            const response = await fetch(`${this.baseUrl}${endpoint}`, {
+                ...options,
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    ...options.headers,
+                },
+            });
+
+            // Log the response details
+            console.log('Response status:', response.status);
+            console.log('Response headers:', Object.fromEntries(response.headers));
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                throw new Error(`Request failed: ${response.status}`);
             }
+
+            return await response.json();
+        } catch (error) {
+            console.error('Full API Error:', {
+                message: error.message,
+                stack: error.stack,
+                endpoint: endpoint,
+                url: this.baseUrl
+            });
+            throw error;
+        }
     },
 
     get(endpoint) {

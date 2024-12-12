@@ -82,9 +82,13 @@ app.post('/webhook', express.raw({type: 'application/json'}), async (req, res) =
 });
 
 // CORS configuration
+
+
 app.use(cors({
   origin: FRONTEND_URL,
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 
 app.use(express.json());
