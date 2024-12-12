@@ -13,7 +13,11 @@ const API = {
         ? 'http://localhost:3002/api' 
         : 'https://klioai.com/api',
 
-    async request(endpoint, options = {}) {
+        async request(endpoint, options = {}) {
+            console.log('API Request Starting:', {
+                url: `${this.baseUrl}${endpoint}`,
+                options: options
+            });
         try {
             const authToken = localStorage.getItem('authToken');
             if (!authToken) throw new Error('No authentication token found');
