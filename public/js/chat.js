@@ -8,16 +8,14 @@ const ChatState = {
 
 // API Service
 const API = {
-    // Match the working configuration from auth.js
-    baseUrl: window.location.hostname === 'localhost' 
-        ? 'http://localhost:3002/api' 
-        : 'https://klioai.com/api',
-
-        async request(endpoint, options = {}) {
-            console.log('API Request Starting:', {
-                url: `${this.baseUrl}${endpoint}`,
-                options: options
-            });
+    baseUrl: window.location.hostname === 'localhost'
+        ? 'http://localhost:3002/api'
+        : '/api',
+    async request(endpoint, options = {}) {
+        console.log('API Request Starting:', {
+            url: `${this.baseUrl}${endpoint}`,
+            options: options
+        });
         try {
             const authToken = localStorage.getItem('authToken');
             if (!authToken) throw new Error('No authentication token found');
@@ -104,7 +102,7 @@ const UI = {
         // Initialize event listeners
         this.initializeEventListeners();
         this.updateTheme();
-        
+
         return true;
     },
 
@@ -148,7 +146,7 @@ const UI = {
     appendMessage(sender, message, suggestions = null) {
         const messageElement = document.createElement('div');
         messageElement.className = `message ${sender}-message`;
-    
+
         if (sender === 'ai') {
             // Clean up the message formatting
             let formattedMessage = message
@@ -165,10 +163,10 @@ const UI = {
                 // Clean up extra whitespace
                 .replace(/\n\s*\n/g, '\n')
                 .trim();
-    
+
             // Split into sections if there are clear section breaks
             const sections = formattedMessage.split(/(?=Creative and Artsy|Games and Challenges|Let's Play|Getting Started)/g);
-            
+
             formattedMessage = sections.map(section => {
                 const [title, ...content] = section.trim().split('\n');
                 if (content.length) {
@@ -183,7 +181,7 @@ const UI = {
                 }
                 return `<p>${title.trim()}</p>`;
             }).join('');
-    
+
             messageElement.innerHTML = `
                 <div class="message-content">
                     ${formattedMessage}
@@ -198,7 +196,7 @@ const UI = {
                 </div>
             `;
         }
-    
+
         this.elements.chatArea.appendChild(messageElement);
         this.scrollToBottom();
     },
@@ -216,10 +214,10 @@ const UI = {
     },
 
     updateTheme() {
-        document.documentElement.setAttribute('data-theme', 
+        document.documentElement.setAttribute('data-theme',
             ChatState.darkMode ? 'dark' : 'light'
         );
-        
+
         this.elements.themeToggleBtn.innerHTML = ChatState.darkMode
             ? '<i class="fas fa-sun"></i>'
             : '<i class="fas fa-moon"></i>';
@@ -314,8 +312,8 @@ const EventHandlers = {
             if (response.success) {
                 ChatState.conversationId = response.conversationId;
                 UI.elements.chatArea.innerHTML = '';
-                
-                UI.appendMessage('ai', 
+
+                UI.appendMessage('ai',
                     `Hi ${ChatState.childData?.name || 'there'}! What would you like to talk about?`,
                     ['Tell me a story', 'Let\'s learn something', 'Play a game', 'Help with homework']
                 );
@@ -359,7 +357,7 @@ async function initializeChat() {
         // Check authentication
         const authToken = localStorage.getItem('authToken');
         const userData = JSON.parse(localStorage.getItem('userData') || 'null');
-        
+
         if (!authToken || !userData) {
             window.location.href = '/index.html';
             return;
