@@ -100,8 +100,8 @@ async function handleChildLogin(event) {
     const password = document.getElementById('password').value;
 
     try {
-        console.log('Attempting child login to:', `${API_URL}/api/auth/child-login`);
-
+        console.log('Attempting login at:', `${API_URL}/api/auth/child-login`);
+        
         const response = await fetch(`${API_URL}/api/auth/child-login`, {
             method: 'POST',
             headers: {
@@ -115,35 +115,21 @@ async function handleChildLogin(event) {
         });
 
         console.log('Response status:', response.status);
-        console.log('Response headers:', Object.fromEntries(response.headers));
-
-        // Try to get the response text first
-        const responseText = await response.text();
-        console.log('Raw response:', responseText);
-
-        // Then parse it as JSON if possible
-        let data;
-        try {
-            data = JSON.parse(responseText);
-        } catch (e) {
-            console.error('Failed to parse response as JSON:', e);
-            throw new Error('Server returned invalid JSON');
-        }
+        
+        const data = await response.json();
+        console.log('Login response:', data);
         
         if (data.success) {
-            console.log('Login successful, saving token and redirecting');
             localStorage.setItem('authToken', data.token);
             localStorage.setItem('userData', JSON.stringify(data.user));
+            
+            // Change this to the absolute path
             window.location.href = '/chat.html';
         } else {
             throw new Error(data.error || 'Login failed');
         }
     } catch (error) {
-        console.error('Full login error:', {
-            message: error.message,
-            stack: error.stack,
-            url: `${API_URL}/api/auth/child-login`
-        });
+        console.error('Login error:', error);
         showError(error.message || 'Login failed. Please check your username and password.');
     }
 }
