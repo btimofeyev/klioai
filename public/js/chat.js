@@ -11,7 +11,7 @@ const API = {
     // Environment-based URL configuration
     baseUrl: window.location.hostname === 'localhost' 
         ? 'http://localhost:3000/api'
-        : 'https://klioai.com/api',
+        : 'https://klioai.com',
 
     async request(endpoint, options = {}) {
         try {
