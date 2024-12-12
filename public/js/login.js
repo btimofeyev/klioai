@@ -100,21 +100,38 @@ async function handleChildLogin(event) {
     const password = document.getElementById('password').value;
 
     try {
+        console.log('Attempting child login to:', `${API_URL}/api/auth/child-login`);
+
         const response = await fetch(`${API_URL}/api/auth/child-login`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'Accept': 'application/json'
             },
             body: JSON.stringify({
                 username,
                 password
-            }),
-            credentials: 'include'
+            })
         });
 
-        const data = await response.json();
+        console.log('Response status:', response.status);
+        console.log('Response headers:', Object.fromEntries(response.headers));
+
+        // Try to get the response text first
+        const responseText = await response.text();
+        console.log('Raw response:', responseText);
+
+        // Then parse it as JSON if possible
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
+            throw new Error('Server returned invalid JSON');
+        }
         
         if (data.success) {
+            console.log('Login successful, saving token and redirecting');
             localStorage.setItem('authToken', data.token);
             localStorage.setItem('userData', JSON.stringify(data.user));
             window.location.href = '/chat.html';
@@ -122,7 +139,11 @@ async function handleChildLogin(event) {
             throw new Error(data.error || 'Login failed');
         }
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Full login error:', {
+            message: error.message,
+            stack: error.stack,
+            url: `${API_URL}/api/auth/child-login`
+        });
         showError(error.message || 'Login failed. Please check your username and password.');
     }
 }
