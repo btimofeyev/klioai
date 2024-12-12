@@ -1,3 +1,5 @@
+
+console.log('Chat.js loading...'); 
 const ChatState = {
     childData: null,
     conversationId: null,
