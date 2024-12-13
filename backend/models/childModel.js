@@ -7,8 +7,7 @@ class Child {
         try {
             await client.query('BEGIN');
 
-            const saltRounds = 10;
-            const passwordHash = await bcrypt.hash(data.password, saltRounds);
+            const passwordHash = await bcrypt.hash(data.password, 10);
 
             const childQuery = `
                 INSERT INTO children (
@@ -23,7 +22,6 @@ class Child {
                 VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
                 RETURNING id, name, age, username, created_at
             `;
-
             const childValues = [parentId, data.name, data.age, data.username, passwordHash];
             const { rows: [child] } = await client.query(childQuery, childValues);
 
@@ -41,7 +39,6 @@ class Child {
                 VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
                 RETURNING *
             `;
-
             const controlsValues = [
                 child.id,
                 data.parentalControls?.filterInappropriate ?? true,
@@ -50,7 +47,6 @@ class Child {
                 data.parentalControls?.allowedStartTime ?? '09:00:00',
                 data.parentalControls?.allowedEndTime ?? '21:00:00'
             ];
-
             const { rows: [controls] } = await client.query(controlsQuery, controlsValues);
 
             const tosQuery = `
@@ -65,7 +61,6 @@ class Child {
                 VALUES ($1, $2, $3, $4, $5, NOW())
                 RETURNING *
             `;
-
             const tosValues = [
                 child.id,
                 parentId,
@@ -73,12 +68,10 @@ class Child {
                 tosData.ipAddress,
                 tosData.userAgent
             ];
-
             await client.query(tosQuery, tosValues);
 
             await client.query('COMMIT');
             return { child, controls };
-
         } catch (error) {
             await client.query('ROLLBACK');
             throw error;
@@ -89,7 +82,7 @@ class Child {
 
     static async getProfile(userId) {
         try {
-            const profileResult = await pool.query(`
+            const profileQuery = `
                 SELECT 
                     c.*,
                     pc.filter_inappropriate,
@@ -99,15 +92,16 @@ class Child {
                 FROM children c
                 LEFT JOIN parental_controls pc ON c.id = pc.child_id
                 WHERE c.id = $1
-            `, [userId]);
+            `;
+            const profileResult = await pool.query(profileQuery, [userId]);
 
             if (!profileResult.rows[0]) {
-                throw new Error(`No child profile found for ID: ${userId}`);
+                throw new Error('No child profile found');
             }
 
             const profile = profileResult.rows[0];
 
-            const summariesResult = await pool.query(`
+            const summariesQuery = `
                 SELECT 
                     summary,
                     created_at,
@@ -116,7 +110,8 @@ class Child {
                 WHERE child_id = $1 
                 ORDER BY created_at DESC 
                 LIMIT 5
-            `, [userId]);
+            `;
+            const summariesResult = await pool.query(summariesQuery, [userId]);
 
             const formattedSummaries = summariesResult.rows.map(row => ({
                 summary: row.summary,
@@ -130,10 +125,9 @@ class Child {
                 : 'This is our first chat!';
 
             delete profile.password_hash;
-
             return profile;
         } catch (error) {
-            throw new Error(`Error fetching child profile: ${error.message}`);
+            throw new Error(`Error fetching profile: ${error.message}`);
         }
     }
 
@@ -166,46 +160,45 @@ class Child {
     }
 
     static async findByParentId(parentId) {
-        try {
-            const query = `
-                SELECT 
-                    c.*,
-                    pc.message_limit,
-                    pc.allowed_start_time,
-                    pc.allowed_end_time
-                FROM children c
-                LEFT JOIN parental_controls pc ON c.id = pc.child_id
-                WHERE c.parent_id = $1
-                ORDER BY c.created_at DESC
-            `;
+        const query = `
+            SELECT 
+                c.*,
+                pc.message_limit,
+                pc.allowed_start_time,
+                pc.allowed_end_time
+            FROM children c
+            LEFT JOIN parental_controls pc ON c.id = pc.child_id
+            WHERE c.parent_id = $1
+            ORDER BY c.created_at DESC
+        `;
 
+        try {
             const { rows } = await pool.query(query, [parentId]);
             return rows;
         } catch (error) {
-            throw new Error(`Error finding children: ${error.message}`);
+            throw new Error(`Error fetching children for parent: ${error.message}`);
         }
     }
 
     static async findById(childId, parentId = null) {
+        let query = `
+            SELECT 
+                c.*,
+                pc.message_limit,
+                pc.allowed_start_time,
+                pc.allowed_end_time
+            FROM children c
+            LEFT JOIN parental_controls pc ON c.id = pc.child_id
+            WHERE c.id = $1
+        `;
+
+        const values = [childId];
+        if (parentId) {
+            query += ' AND c.parent_id = $2';
+            values.push(parentId);
+        }
+
         try {
-            let query = `
-                SELECT 
-                    c.*,
-                    pc.message_limit,
-                    pc.allowed_start_time,
-                    pc.allowed_end_time
-                FROM children c
-                LEFT JOIN parental_controls pc ON c.id = pc.child_id
-                WHERE c.id = $1
-            `;
-
-            const values = [childId];
-
-            if (parentId) {
-                query += ' AND c.parent_id = $2';
-                values.push(parentId);
-            }
-
             const { rows } = await pool.query(query, values);
             return rows[0] || null;
         } catch (error) {
@@ -232,15 +225,12 @@ class Child {
 
     static async updatePassword(childId, newPassword) {
         try {
-            const saltRounds = 10;
-            const passwordHash = await bcrypt.hash(newPassword, saltRounds);
-            
+            const passwordHash = await bcrypt.hash(newPassword, 10);
             await pool.query(`
                 UPDATE children
                 SET password_hash = $1, updated_at = NOW()
                 WHERE id = $2
             `, [passwordHash, childId]);
-            
             return true;
         } catch (error) {
             throw new Error(`Error updating password: ${error.message}`);
@@ -252,7 +242,7 @@ class Child {
         try {
             await client.query('BEGIN');
 
-            const deletionQueries = [
+            const queries = [
                 'DELETE FROM chat_summaries WHERE child_id = $1',
                 'DELETE FROM chat_messages WHERE child_id = $1',
                 'DELETE FROM session_tracking WHERE child_id = $1',
@@ -263,11 +253,11 @@ class Child {
                 'DELETE FROM children WHERE id = $1 AND parent_id = $2 RETURNING id'
             ];
 
-            for (const query of deletionQueries) {
-                if (query.includes('parent_id')) {
-                    await client.query(query, [id, parentId]);
+            for (const q of queries) {
+                if (q.includes('parent_id')) {
+                    await client.query(q, [id, parentId]);
                 } else {
-                    await client.query(query, [id]);
+                    await client.query(q, [id]);
                 }
             }
 
@@ -275,7 +265,7 @@ class Child {
             return { success: true };
         } catch (error) {
             await client.query('ROLLBACK');
-            throw new Error(`Error deleting child account: ${error.message}`);
+            throw new Error(`Error deleting child: ${error.message}`);
         } finally {
             client.release();
         }
@@ -293,7 +283,6 @@ class Child {
                 WHERE child_id = $1
                 ORDER BY accepted_at DESC
             `, [childId]);
-            
             return rows;
         } catch (error) {
             throw new Error(`Error fetching TOS history: ${error.message}`);
@@ -308,10 +297,9 @@ function formatTimestamp(timestamp) {
     
     if (diffHours < 24) {
         return `${diffHours} hours ago`;
-    } else {
-        const diffDays = Math.floor(diffHours / 24);
-        return `${diffDays} days ago`;
     }
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} days ago`;
 }
 
 module.exports = Child;

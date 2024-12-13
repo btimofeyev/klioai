@@ -2,11 +2,7 @@ const pool = require('../config/db');
 
 class ParentalControl {
     static async create(childId) {
-        if (!childId) {
-            throw new Error('Child ID is required to create parental controls');
-        }
-
-        console.log('Creating default parental controls for child:', childId);
+        if (!childId) throw new Error('Child ID is required to create parental controls');
 
         const query = `
             INSERT INTO parental_controls (
@@ -30,54 +26,39 @@ class ParentalControl {
                 updated_at = NOW()
             RETURNING *
         `;
-        
+
         try {
             const { rows } = await pool.query(query, [childId]);
-            console.log('Created/Updated parental controls:', rows[0]);
             return rows[0];
         } catch (error) {
-            console.error('Error in create parental controls:', error);
+            console.error('Error creating parental controls:', error);
             throw new Error(`Error creating parental controls: ${error.message}`);
         }
     }
 
     static async findByChildId(childId) {
-        if (!childId) {
-            throw new Error('Child ID is required to fetch parental controls');
-        }
+        if (!childId) throw new Error('Child ID is required to fetch parental controls');
 
-        console.log('Finding parental controls for child:', childId);
-
+        const controlsQuery = `
+            SELECT *
+            FROM parental_controls
+            WHERE child_id = $1
+        `;
+        
         try {
-            // First try to find existing controls
-            const controlsQuery = `
-                SELECT *
-                FROM parental_controls
-                WHERE child_id = $1
-            `;
-            
             const { rows } = await pool.query(controlsQuery, [childId]);
-            
-            // If no controls exist, create default ones
             if (rows.length === 0) {
-                console.log('No controls found for child, creating defaults...');
                 return await this.create(childId);
             }
-
-            console.log('Found existing parental controls:', rows[0]);
             return rows[0];
         } catch (error) {
-            console.error('Error in findByChildId:', error);
+            console.error('Error fetching parental controls:', error);
             throw new Error(`Error fetching parental controls: ${error.message}`);
         }
     }
 
     static async update(childId, data) {
-        if (!childId) {
-            throw new Error('Child ID is required to update parental controls');
-        }
-
-        console.log('Updating parental controls for child:', childId, 'with data:', data);
+        if (!childId) throw new Error('Child ID is required to update parental controls');
 
         const query = `
             UPDATE parental_controls
@@ -91,7 +72,7 @@ class ParentalControl {
             WHERE child_id = $1
             RETURNING *
         `;
-        
+
         const values = [
             childId,
             data.filterInappropriate,
@@ -106,18 +87,15 @@ class ParentalControl {
             if (rows.length === 0) {
                 return await this.create(childId);
             }
-            console.log('Updated parental controls:', rows[0]);
             return rows[0];
         } catch (error) {
-            console.error('Error in update:', error);
+            console.error('Error updating parental controls:', error);
             throw new Error(`Error updating parental controls: ${error.message}`);
         }
     }
 
     static async getDailyMessages(childId) {
-        if (!childId) {
-            throw new Error('Child ID is required to get daily message count');
-        }
+        if (!childId) throw new Error('Child ID is required to get daily message count');
 
         const query = `
             SELECT COUNT(*) as message_count
@@ -129,17 +107,15 @@ class ParentalControl {
         
         try {
             const { rows } = await pool.query(query, [childId]);
-            return parseInt(rows[0].message_count);
+            return parseInt(rows[0].message_count, 10);
         } catch (error) {
-            console.error('Error in getDailyMessages:', error);
+            console.error('Error getting daily message count:', error);
             throw new Error(`Error getting daily message count: ${error.message}`);
         }
     }
 
     static async getActiveSession(childId) {
-        if (!childId) {
-            throw new Error('Child ID is required to get active session');
-        }
+        if (!childId) throw new Error('Child ID is required to get active session');
 
         const query = `
             SELECT *
@@ -154,7 +130,7 @@ class ParentalControl {
             const { rows } = await pool.query(query, [childId]);
             return rows[0] || null;
         } catch (error) {
-            console.error('Error in getActiveSession:', error);
+            console.error('Error getting active session:', error);
             throw new Error(`Error getting active session: ${error.message}`);
         }
     }

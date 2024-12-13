@@ -1,4 +1,3 @@
-// models/longTermMemoryModel.js
 const pool = require("../config/db");
 const OpenAI = require("openai");
 
@@ -8,36 +7,25 @@ const openai = new OpenAI({
 
 class LongTermMemoryModel {
     static async processNewSummary(childId, summary) {
+        const client = await pool.connect();
         try {
-            // Extract insights about interests and knowledge
             const insights = await this.extractInsights(summary);
-            console.log('Initial insights:', insights);
 
-            await pool.query('BEGIN');
+            await client.query('BEGIN');
 
-            // Get existing topics for this child
-            const existingTopics = await pool.query(
+            const existingTopicsRes = await client.query(
                 `SELECT topic, details FROM long_term_memory_graph WHERE child_id = $1`,
                 [childId]
             );
 
-            // Create a map of similar topics
-            const topicMap = this.createTopicMap(existingTopics.rows);
-            console.log('Topic map:', topicMap);
+            const topicMap = this.createTopicMap(existingTopicsRes.rows);
 
             for (const topic of insights.topics) {
-                // Skip generic conversational topics
-                if (this.isGenericTopic(topic)) {
-                    console.log(`Skipping generic topic: ${topic}`);
-                    continue;
-                }
+                if (this.isGenericTopic(topic)) continue;
 
-                // Check for similar existing topics
                 const matchingTopic = this.findMatchingTopic(topic, topicMap);
-                console.log(`Topic: ${topic}, Matching topic: ${matchingTopic}`);
 
                 if (matchingTopic) {
-                    // Update existing topic with new information
                     await this.updateExistingTopic(
                         childId,
                         matchingTopic,
@@ -46,7 +34,6 @@ class LongTermMemoryModel {
                         topicMap[matchingTopic]
                     );
                 } else {
-                    // Create new topic
                     const initialDetails = {
                         sub_topics: insights.sub_topics[topic] || [],
                         knowledge_bits: [{
@@ -57,23 +44,22 @@ class LongTermMemoryModel {
                         related_interests: insights.related_interests[topic] || []
                     };
 
-                    await pool.query(
+                    await client.query(
                         `INSERT INTO long_term_memory_graph 
                          (child_id, category, topic, details, first_seen, last_seen)
                          VALUES ($1, $2, $3, $4::jsonb, NOW(), NOW())`,
                         [childId, 'interest', topic, initialDetails]
                     );
-                    console.log(`Created new topic: ${topic}`);
                 }
             }
 
-            await pool.query('COMMIT');
-            console.log('Successfully processed summary into long-term memory');
-
+            await client.query('COMMIT');
         } catch (error) {
             await pool.query('ROLLBACK');
             console.error('Error processing new summary:', error);
             throw error;
+        } finally {
+            pool.release();
         }
     }
 
@@ -81,48 +67,8 @@ class LongTermMemoryModel {
         const systemMessage = {
             role: "system",
             content: `You are analyzing conversations to build a child's long-term memory profile.
-                     Extract key insights about core interests and knowledge, not conversation styles.
-                     
-                     Focus on:
-                     1. Main interests (science, space, animals, etc.)
-                     2. Specific knowledge gained
-                     3. Connected topics and subtopics
-                     4. Depth of understanding
-
-                     Return a JSON object with:
-                     {
-                         "topics": ["main interest/topic"],
-                         "knowledge_bits": {
-                             "topic": "specific new knowledge learned about this topic"
-                         },
-                         "sub_topics": {
-                             "topic": ["specific aspects of this topic the child knows about"]
-                         },
-                         "related_interests": {
-                             "topic": ["broader areas this connects to"]
-                         }
-                     }
-
-                     Example:
-                     For "Child discussed Mars' moons and showed interest in space exploration"
-                     {
-                         "topics": ["space exploration"],
-                         "knowledge_bits": {
-                             "space exploration": "Knows about Mars' moons and their characteristics"
-                         },
-                         "sub_topics": {
-                             "space exploration": ["Mars", "moons", "planetary science"]
-                         },
-                         "related_interests": {
-                             "space exploration": ["astronomy", "planetary science", "space technology"]
-                         }
-                     }
-                     
-                     DO NOT create topics about:
-                     - Conversation styles
-                     - Generic greetings
-                     - Communication patterns
-                     - Basic interactions`
+                      Extract core interests, knowledge, subtopics, and related interests as JSON.
+                      Ignore generic, conversational patterns and focus on subject matter interests.`
         };
 
         try {
@@ -146,11 +92,8 @@ class LongTermMemoryModel {
 
     static createTopicMap(existingTopics) {
         const topicMap = {};
-        existingTopics.forEach(row => {
-            const details = typeof row.details === 'string' ? 
-                JSON.parse(row.details) : row.details;
-
-            // Create normalized versions of topics and subtopics
+        for (const row of existingTopics) {
+            const details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
             const mainTopic = row.topic.toLowerCase();
             const relatedTerms = [
                 ...details.sub_topics.map(st => st.toLowerCase()),
@@ -162,29 +105,20 @@ class LongTermMemoryModel {
                 relatedTerms,
                 details
             };
-        });
+        }
         return topicMap;
     }
 
     static findMatchingTopic(newTopic, topicMap) {
-        const normalizedNew = newTopic.toLowerCase();
+        const normalized = newTopic.toLowerCase();
 
-        // First check for exact matches
-        if (topicMap[normalizedNew]) {
-            return topicMap[normalizedNew].originalTopic;
+        if (topicMap[normalized]) {
+            return topicMap[normalized].originalTopic;
         }
 
-        // Then check for similar topics
         for (const [existingTopic, data] of Object.entries(topicMap)) {
-            // Check if topics are similar
-            if (this.areTopicsSimilar(normalizedNew, existingTopic)) {
-                return data.originalTopic;
-            }
-
-            // Check if new topic is related to existing topic
-            if (data.relatedTerms.some(term => 
-                this.areTopicsSimilar(normalizedNew, term)
-            )) {
+            if (this.areTopicsSimilar(normalized, existingTopic) || 
+                data.relatedTerms.some(term => this.areTopicsSimilar(normalized, term))) {
                 return data.originalTopic;
             }
         }
@@ -193,27 +127,21 @@ class LongTermMemoryModel {
     }
 
     static areTopicsSimilar(topic1, topic2) {
-        const normalize = (text) => {
-            return text.toLowerCase()
-                .replace(/[^a-z0-9 ]/g, '')
-                .split(' ')
-                .filter(word => !this.commonWords.includes(word))
-                .join(' ');
-        };
+        const normalize = (text) => text.toLowerCase()
+            .replace(/[^a-z0-9 ]/g, '')
+            .split(' ')
+            .filter(word => !this.commonWords.includes(word))
+            .join(' ');
 
-        const normalized1 = normalize(topic1);
-        const normalized2 = normalize(topic2);
+        const n1 = normalize(topic1);
+        const n2 = normalize(topic2);
 
-        // Check for substring matches
-        if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) {
-            return true;
-        }
+        if (n1.includes(n2) || n2.includes(n1)) return true;
 
-        // Check for word similarity
-        const words1 = new Set(normalized1.split(' '));
-        const words2 = new Set(normalized2.split(' '));
+        const words1 = new Set(n1.split(' '));
+        const words2 = new Set(n2.split(' '));
         const intersection = new Set([...words1].filter(x => words2.has(x)));
-        
+
         return intersection.size > 0;
     }
 
@@ -251,23 +179,19 @@ class LongTermMemoryModel {
 
             const recentLearning = memories
                 .filter(m => {
-                    const recency = typeof m.recency === 'object' ? 
-                        m.recency.days || 0 : 0;
-                    return recency < 7;
+                    const diffDays = this.getDaysFromInterval(m.recency);
+                    return diffDays < 7;
                 })
                 .map(m => {
-                    const details = typeof m.details === 'string' ? 
-                        JSON.parse(m.details) : m.details;
+                    const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;
                     return details.knowledge_bits[details.knowledge_bits.length - 1];
                 });
 
             const knowledgeGraph = memories.reduce((acc, m) => {
-                const details = typeof m.details === 'string' ? 
-                    JSON.parse(m.details) : m.details;
-                
+                const details = typeof m.details === 'string' ? JSON.parse(m.details) : m.details;
                 acc[m.topic] = {
                     engagement: m.engagement_count,
-                    details: details
+                    details
                 };
                 return acc;
             }, {});
@@ -295,20 +219,16 @@ class LongTermMemoryModel {
                 learned_at: new Date().toISOString()
             };
 
-            // Add new knowledge if it doesn't exist
             if (!details.knowledge_bits.some(kb => kb.fact === newKnowledgeBit.fact)) {
                 details.knowledge_bits.push(newKnowledgeBit);
             }
 
-            // Add new subtopics
             const newSubTopics = insights.sub_topics[newTopic] || [];
             details.sub_topics = [...new Set([...details.sub_topics, ...newSubTopics])];
 
-            // Add new related interests
             const newRelatedInterests = insights.related_interests[newTopic] || [];
             details.related_interests = [...new Set([...details.related_interests, ...newRelatedInterests])];
 
-            // Update the topic in the database
             await pool.query(
                 `UPDATE long_term_memory_graph 
                  SET details = $1::jsonb,
@@ -317,35 +237,32 @@ class LongTermMemoryModel {
                  WHERE child_id = $2 AND topic = $3`,
                 [details, childId, existingTopic]
             );
-
-            console.log(`Updated existing topic: ${existingTopic} with new information`);
         } catch (error) {
             console.error('Error updating existing topic:', error);
             throw error;
         }
     }
 
-    static isGenericTopic(topic) {
-        const genericTopics = [
-            'greetings',
-            'conversation',
-            'communication',
-            'discussion',
-            'engagement',
-            'interaction',
-            'flexibility',
-            'response',
-            'chat',
-            'talking',
-            'speaking'
-        ];
-
-        return genericTopics.some(generic => 
-            topic.toLowerCase().includes(generic.toLowerCase())
-        );
+    static getDaysFromInterval(interval) {
+        // interval may be returned as a Postgres interval object or a numeric
+        // fallback to 0 if cannot parse
+        if (!interval) return 0;
+        if (typeof interval === 'object' && interval.days !== undefined) {
+            return interval.days;
+        }
+        return 0;
     }
 
-    // Common words to ignore in topic matching
+    static isGenericTopic(topic) {
+        const genericTopics = [
+            'greetings', 'conversation', 'communication', 'discussion',
+            'engagement', 'interaction', 'flexibility', 'response', 
+            'chat', 'talking', 'speaking'
+        ];
+
+        return genericTopics.some(g => topic.toLowerCase().includes(g));
+    }
+
     static commonWords = [
         'the', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of',
         'with', 'by', 'about', 'like', 'through', 'over', 'before',

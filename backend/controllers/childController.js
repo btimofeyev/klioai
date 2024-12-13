@@ -14,10 +14,7 @@ const helpers = {
     },
 
     handleResponse: (res, data, status = 200) => {
-        res.status(status).json({
-            success: true,
-            ...data
-        });
+        res.status(status).json({ success: true, ...data });
     },
 
     handleError: (res, error, status = 500) => {
@@ -40,7 +37,7 @@ const helpers = {
             patterns.interests.push(`Shows strong interest in ${memoryGraph.mainInterests.join(', ')}`);
         }
 
-        Object.entries(memoryGraph.knowledgeGraph || {}).forEach(([topic, data]) => {
+        for (const [topic, data] of Object.entries(memoryGraph.knowledgeGraph || {})) {
             if (data.engagement > 5) {
                 patterns.strengths.push(`Demonstrates deep understanding of ${topic}`);
             }
@@ -50,7 +47,7 @@ const helpers = {
             if (data.engagement < 3 && data.details?.sub_topics?.length > 0) {
                 patterns.growth_areas.push(`Could explore more aspects of ${topic}`);
             }
-        });
+        }
 
         return patterns;
     },
@@ -61,19 +58,15 @@ const helpers = {
         if (!data.name?.trim()) {
             errors.push('Name is required');
         }
-
         if (!data.age || data.age < 5 || data.age > 17) {
             errors.push('Age must be between 5 and 17');
         }
-
         if (!data.username?.trim()) {
             errors.push('Username is required');
         }
-
         if (!data.password || data.password.length < 8) {
             errors.push('Password must be at least 8 characters long');
         }
-
         if (!data.tosAcceptance) {
             errors.push('Terms of Service acceptance is required');
         }
@@ -89,13 +82,10 @@ const childController = {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
-            
+
             const parentId = req.user.id;
-            
-            // Validate input data
             helpers.validateChildData(req.body);
 
-            // Check plan limits
             const { rows: [parent] } = await client.query(`
                 SELECT 
                     u.plan_type,
@@ -113,20 +103,17 @@ const childController = {
 
             const maxChildren = effectivePlanType === 'familypro' ? 3 : 1;
             if (parent.child_count >= maxChildren) {
-                throw new Error(`Your ${effectivePlanType === 'familypro' ? 'Family Pro' : 'Single'} plan allows up to ${maxChildren} child ${maxChildren === 1 ? 'account' : 'accounts'}. Please upgrade your plan to add more children.`);
+                throw new Error(`Your ${effectivePlanType === 'familypro' ? 'Family Pro' : 'Single'} plan allows up to ${maxChildren} child${maxChildren > 1 ? 'ren' : ''}. Please upgrade your plan to add more.`);
             }
 
-            // Check username availability
             const existingChild = await client.query(
                 'SELECT id FROM children WHERE username = $1',
                 [req.body.username]
             );
-
             if (existingChild.rows.length > 0) {
                 throw new Error('Username is already taken');
             }
 
-            // Create child account with TOS acceptance
             const { child, controls } = await Child.createWithTOS(
                 {
                     name: req.body.name,
@@ -140,7 +127,7 @@ const childController = {
             );
 
             await client.query('COMMIT');
-            
+
             helpers.handleResponse(res, {
                 child: {
                     ...child,
@@ -168,11 +155,10 @@ const childController = {
         try {
             const { id: parentId } = req.user;
             const childId = req.params.id;
-            
+
             await helpers.verifyParentAccess(childId, parentId);
             await client.query('BEGIN');
 
-            // Update basic information
             const updatedChild = await Child.update(childId, {
                 name: req.body.name,
                 age: req.body.age,
@@ -183,17 +169,14 @@ const childController = {
                 throw new Error('Failed to update child information');
             }
 
-            // Update password if provided
             if (req.body.password) {
                 await Child.updatePassword(childId, req.body.password);
             }
 
-            // Update parental controls if provided
             if (req.body.parentalControls) {
                 await ParentalControl.update(childId, req.body.parentalControls);
             }
 
-            // Get updated data
             const [childData, controls] = await Promise.all([
                 Child.findById(childId, parentId),
                 ParentalControl.findByChildId(childId)
@@ -236,15 +219,11 @@ const childController = {
 
             const planType = rows[0]?.plan_type || 'basic';
             const subscriptionStatus = rows[0]?.subscription_status || 'inactive';
-            const effectivePlanType = (subscriptionStatus === 'active' && planType !== 'basic') 
-                ? planType 
-                : 'basic';
+            const effectivePlanType = (subscriptionStatus === 'active' && planType !== 'basic') ? planType : 'basic';
 
             const children = rows
                 .filter(row => row.id)
-                .map(({
-                    id, name, age, username, created_at, last_active
-                }) => ({
+                .map(({ id, name, age, username, created_at, last_active }) => ({
                     id,
                     name,
                     age,
@@ -253,10 +232,7 @@ const childController = {
                     last_active
                 }));
 
-            helpers.handleResponse(res, {
-                children,
-                planType: effectivePlanType
-            });
+            helpers.handleResponse(res, { children, planType: effectivePlanType });
         } catch (error) {
             helpers.handleError(res, error, 400);
         }
@@ -361,9 +337,9 @@ const childController = {
 
             await helpers.verifyParentAccess(childId, parentId);
             await Child.delete(childId, parentId);
-            
-            helpers.handleResponse(res, { 
-                message: 'Child account and all related data deleted successfully' 
+
+            helpers.handleResponse(res, {
+                message: 'Child account and all related data deleted successfully'
             });
         } catch (error) {
             helpers.handleError(res, error);
@@ -377,7 +353,7 @@ const childController = {
 
             await helpers.verifyParentAccess(childId, parentId);
             const history = await Child.getTOSHistory(childId);
-            
+
             helpers.handleResponse(res, { history });
         } catch (error) {
             helpers.handleError(res, error);
@@ -391,7 +367,7 @@ const childController = {
 
             await helpers.verifyParentAccess(childId, parentId);
             const summaries = await ChatModel.getSummaries(childId);
-            
+
             helpers.handleResponse(res, { summaries });
         } catch (error) {
             helpers.handleError(res, error);
@@ -405,7 +381,7 @@ const childController = {
 
             await helpers.verifyParentAccess(childId, parentId);
             const memoryGraph = await LongTermMemoryModel.getChildMemoryGraph(childId);
-            
+
             helpers.handleResponse(res, { memory: memoryGraph });
         } catch (error) {
             helpers.handleError(res, error);
@@ -418,7 +394,7 @@ const childController = {
             const { id: childId, topic } = req.params;
 
             await helpers.verifyParentAccess(childId, parentId);
-            
+
             const result = await pool.query(`
                 DELETE FROM long_term_memory_graph 
                 WHERE child_id = $1 AND topic = $2
@@ -429,8 +405,8 @@ const childController = {
                 throw new Error('Memory topic not found');
             }
 
-            helpers.handleResponse(res, { 
-                message: 'Memory topic deleted successfully' 
+            helpers.handleResponse(res, {
+                message: 'Memory topic deleted successfully'
             });
         } catch (error) {
             helpers.handleError(res, error);

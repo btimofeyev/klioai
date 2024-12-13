@@ -3,16 +3,15 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
 
-// Load environment variables first
+// Load environment variables
 dotenv.config();
 
-// Environment-specific configuration
 const isProduction = process.env.NODE_ENV === 'production';
 const FRONTEND_URL = isProduction 
   ? 'https://klioai.com'
   : (process.env.FRONTEND_URL || 'http://localhost:3000');
 
-// Route imports
+// Imports
 const authRoutes = require('./routes/authRoutes');
 const childRoutes = require('./routes/childRoutes');
 const parentalControlRoutes = require('./routes/parentalControlRoutes');
@@ -21,38 +20,34 @@ const stripeRoutes = require('./routes/stripeRoutes');
 const ChatModel = require('./models/chatModel');
 const scheduleCleanup = require('./utils/cleanupScheduler');
 const User = require('./models/userModel');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
-// Middleware imports
 const { verifyToken } = require('./middleware/authMiddleware');
 const { checkSubscription } = require('./middleware/subscriptionMiddleware');
 
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const app = express();
 
-// Webhook should be before CORS middleware
-app.post('/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+// Stripe webhook (raw body parsing)
+app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   const sig = req.headers['stripe-signature'];
 
-  let event;
   try {
-    event = stripe.webhooks.constructEvent(
+    const event = stripe.webhooks.constructEvent(
       req.body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET
     );
 
-    console.log('Webhook event received:', event.type);
-
     switch (event.type) {
-      case 'checkout.session.completed':
+      case 'checkout.session.completed': {
         const session = event.data.object;
         const subscription = await stripe.subscriptions.retrieve(session.subscription);
         const priceId = subscription.items.data[0].price.id;
+
         const planMap = {
           'price_1QP9N4DII9A9349ohlOJgJEE': 'single',
           'price_1QP9NLDII9A9349oDRxFpdWx': 'familypro'
         };
-        const planType = planMap[priceId];
+        const planType = planMap[priceId] || 'single';
 
         const userData = {
           email: session.metadata.email,
@@ -64,14 +59,15 @@ app.post('/webhook', express.raw({type: 'application/json'}), async (req, res) =
           stripe_subscription_id: session.subscription
         };
 
-        const user = await User.handleStripeWebhook(userData);
-        console.log('Updated user:', user);
+        await User.handleStripeWebhook(userData);
         break;
+      }
 
-      case 'customer.subscription.updated':
+      case 'customer.subscription.updated': {
         const updatedSubscription = event.data.object;
         await User.handleSubscriptionUpdate(updatedSubscription);
         break;
+      }
     }
 
     res.json({ received: true });
@@ -81,9 +77,7 @@ app.post('/webhook', express.raw({type: 'application/json'}), async (req, res) =
   }
 });
 
-// CORS configuration
-
-
+// CORS
 app.use(cors({
   origin: [
     'https://klioai.com',
@@ -106,10 +100,10 @@ app.use('/api/children', verifyToken, checkSubscription, childRoutes);
 app.use('/api/parental-controls', verifyToken, checkSubscription, parentalControlRoutes);
 app.use('/api/chat', verifyToken, checkSubscription, chatRoutes);
 
-// Static file serving
+// Static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// Route handlers
+// Frontend routes
 app.get('/dashboard', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/dashboard.html'));
 });
@@ -136,14 +130,12 @@ async function startServer() {
 
     await Promise.all([
       ChatModel.initializeDatabase(),
-      scheduleCleanup()  
+      scheduleCleanup()
     ]);
-    console.log("Database and cleanup routines initialized.");
 
     const PORT = process.env.PORT || 3002;
     app.listen(PORT, () => {
-      console.log(`Server is running on http://localhost:${PORT}`);
-      console.log('Session tracking and parental controls active');
+      console.log(`Server running on http://localhost:${PORT}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
