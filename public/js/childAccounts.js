@@ -135,6 +135,121 @@ class ChildAccountManager {
             this.showError('Failed to load child data for editing');
         }
     }
+    showTermsOfServiceModal(onAccept) {
+        this.removeExistingModals();
+
+        const modalHtml = `
+        <div class="modal-overlay">
+            <div class="modal-container">
+                <div class="modal-header">
+                    <h2><i class="fas fa-shield-alt"></i> Important Notice: Child Account Terms of Service</h2>
+                    <button class="modal-close" aria-label="Close modal">&times;</button>
+                </div>
+                
+                <div class="modal-content">
+                    <div class="form-card">
+                        <div class="warning-message" style="background: #FEF9C3; border: 1px solid #FDE047; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                            <div style="display: flex; gap: 0.75rem; align-items: center; color: #854D0E;">
+                                <i class="fas fa-triangle-exclamation"></i>
+                                <p>As a parent/guardian, you are responsible for monitoring your child's activity and ensuring their safety.</p>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 1.5rem;">
+                            <p class="font-medium" style="margin-bottom: 1rem;">By creating a child account, you acknowledge and agree to:</p>
+                            <ul style="list-style-type: disc; padding-left: 1.5rem; margin-bottom: 1rem;">
+                                <li>Regularly review your child's chat history and activities</li>
+                                <li>Monitor notifications about potentially concerning topics</li>
+                                <li>Set and maintain appropriate parental controls</li>
+                                <li>Take action if you notice any inappropriate content or behavior</li>
+                            </ul>
+                        </div>
+
+                        <div style="background: var(--chip-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
+                            <p class="font-medium" style="margin-bottom: 0.5rem;">Important Safety Information:</p>
+                            <ul style="list-style-type: none;">
+                                <li style="margin-bottom: 0.5rem;">• While our AI is designed to be child-friendly, it may occasionally make mistakes or generate unexpected responses</li>
+                                <li style="margin-bottom: 0.5rem;">• We use content filtering but cannot guarantee 100% accuracy in blocking inappropriate content</li>
+                                <li>• The AI should not be considered a substitute for human supervision or guidance</li>
+                            </ul>
+                        </div>
+
+                        <div class="checkbox-field">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="tosConsent">
+                                <span class="checkbox-text">
+                                    I understand my responsibilities as a parent/guardian and agree to actively monitor my child's account activity. I acknowledge that the AI system is not infallible and requires my oversight.
+                                </span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-secondary" data-close-modal>
+                            Cancel
+                        </button>
+                        <button type="button" 
+                                class="btn btn-primary" 
+                                id="acceptTermsBtn"
+                                disabled>
+                            Accept & Continue
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Insert the modal HTML
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Wait for next frame to ensure elements are in DOM
+    requestAnimationFrame(() => {
+        const modal = document.querySelector('.modal-overlay');
+        if (!modal) return;
+
+        // Show modal with animation
+        modal.classList.add('show');
+
+        // Get all required elements
+        const closeBtn = modal.querySelector('.modal-close');
+        const cancelBtn = modal.querySelector('[data-close-modal]');
+        const acceptBtn = modal.querySelector('#acceptTermsBtn');
+        const consentCheckbox = modal.querySelector('#tosConsent');
+
+        // Only add event listeners if elements exist
+        if (consentCheckbox) {
+            consentCheckbox.addEventListener('change', (e) => {
+                if (acceptBtn) {
+                    acceptBtn.disabled = !e.target.checked;
+                }
+            });
+        }
+
+        if (acceptBtn) {
+            acceptBtn.addEventListener('click', () => {
+                if (consentCheckbox?.checked) {
+                    this.closeModal(modal);
+                    onAccept();
+                }
+            });
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeModal(modal));
+        }
+
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.closeModal(modal));
+        }
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                this.closeModal(modal);
+            }
+        });
+    });
+}
 
     // UI Event Handlers
     handleAddChildClick() {
@@ -162,23 +277,26 @@ class ChildAccountManager {
 
     async handleAddChild(e, modal) {
         e.preventDefault();
-        try {
-            const childData = this.getFormData(e.target);
-            const result = await this.makeRequest('/api/children', {
-                method: 'POST',
-                body: JSON.stringify(childData)
-            });
-            
-            if (result?.success) {
-                this.closeModal(modal);
-                await this.loadChildren();
-                this.showSuccess('Child account created successfully');
-            } else if (result?.message?.includes('upgrade')) {
-                this.showUpgradeModal(result.message);
+        
+        this.showTermsOfServiceModal(async () => {
+            try {
+                const childData = this.getFormData(e.target);
+                const result = await this.makeRequest('/api/children', {
+                    method: 'POST',
+                    body: JSON.stringify(childData)
+                });
+                
+                if (result?.success) {
+                    this.closeModal(modal);
+                    await this.loadChildren();
+                    this.showSuccess('Child account created successfully');
+                } else if (result?.message?.includes('upgrade')) {
+                    this.showUpgradeModal(result.message);
+                }
+            } catch (error) {
+                this.showError(error.message);
             }
-        } catch (error) {
-            this.showError(error.message);
-        }
+        });
     }
 
     async deleteChildAccount(childId) {
