@@ -2,18 +2,14 @@ const pool = require('../config/db');
 const bcrypt = require('bcrypt');
 
 class Child {
-    static async create(data, parentId) {
+    static async createWithTOS(data, parentId, tosData) {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
-            console.log('Creating child with data:', { ...data, parentId });
-
-            // Hash password
             const saltRounds = 10;
             const passwordHash = await bcrypt.hash(data.password, saltRounds);
 
-            // Create child account
             const childQuery = `
                 INSERT INTO children (
                     parent_id,
@@ -28,18 +24,9 @@ class Child {
                 RETURNING id, name, age, username, created_at
             `;
 
-            const childValues = [
-                parentId,
-                data.name,
-                data.age,
-                data.username,
-                passwordHash
-            ];
-
-            console.log('Executing child creation query with values:', childValues);
+            const childValues = [parentId, data.name, data.age, data.username, passwordHash];
             const { rows: [child] } = await client.query(childQuery, childValues);
 
-            // Create parental controls with provided or default values
             const controlsQuery = `
                 INSERT INTO parental_controls (
                     child_id,
@@ -66,11 +53,31 @@ class Child {
 
             const { rows: [controls] } = await client.query(controlsQuery, controlsValues);
 
-            console.log('Successfully created child:', child);
-            console.log('Created parental controls:', controls);
+            const tosQuery = `
+                INSERT INTO child_tos_acceptance (
+                    child_id,
+                    parent_id,
+                    tos_version,
+                    ip_address,
+                    user_agent,
+                    accepted_at
+                )
+                VALUES ($1, $2, $3, $4, $5, NOW())
+                RETURNING *
+            `;
+
+            const tosValues = [
+                child.id,
+                parentId,
+                tosData.version,
+                tosData.ipAddress,
+                tosData.userAgent
+            ];
+
+            await client.query(tosQuery, tosValues);
 
             await client.query('COMMIT');
-            return { ...child, controls };
+            return { child, controls };
 
         } catch (error) {
             await client.query('ROLLBACK');
@@ -82,9 +89,6 @@ class Child {
 
     static async getProfile(userId) {
         try {
-            console.log('Getting profile for childId:', userId);
-            
-            // First get the main profile data
             const profileResult = await pool.query(`
                 SELECT 
                     c.*,
@@ -103,7 +107,6 @@ class Child {
 
             const profile = profileResult.rows[0];
 
-            // Separately get the last 5 summaries
             const summariesResult = await pool.query(`
                 SELECT 
                     summary,
@@ -115,36 +118,24 @@ class Child {
                 LIMIT 5
             `, [userId]);
 
-            // Format timestamps for summaries
             const formattedSummaries = summariesResult.rows.map(row => ({
                 summary: row.summary,
                 when: formatTimestamp(row.created_at),
                 id: row.summary_id
             }));
 
-            // Add summaries to profile
             profile.learning_summaries = formattedSummaries;
-            
-            // Set most recent summary as the primary learning summary
             profile.learning_summary = formattedSummaries.length > 0 
                 ? formattedSummaries[0].summary 
                 : 'This is our first chat!';
 
-            // Remove sensitive data
             delete profile.password_hash;
-
-            console.log('Enhanced profile data:', {
-                ...profile,
-                summaryCount: formattedSummaries.length
-            });
 
             return profile;
         } catch (error) {
-            console.error('Error in getProfile:', error);
             throw new Error(`Error fetching child profile: ${error.message}`);
         }
     }
-
 
     static async updateLastActivity(childId) {
         try {
@@ -157,6 +148,7 @@ class Child {
             console.error('Error updating last activity:', error);
         }
     }
+
     static async findByUsername(username) {
         const query = `
             SELECT c.*, u.email as parent_email 
@@ -172,10 +164,9 @@ class Child {
             throw new Error(`Error finding child by username: ${error.message}`);
         }
     }
+
     static async findByParentId(parentId) {
         try {
-            console.log('Finding children for parent:', parentId);
-
             const query = `
                 SELECT 
                     c.*,
@@ -189,18 +180,14 @@ class Child {
             `;
 
             const { rows } = await pool.query(query, [parentId]);
-            console.log(`Found ${rows.length} children for parent ${parentId}`);
             return rows;
         } catch (error) {
-            console.error('Error in findByParentId:', error);
             throw new Error(`Error finding children: ${error.message}`);
         }
     }
 
     static async findById(childId, parentId = null) {
         try {
-            console.log('Finding child by ID:', childId, parentId ? `for parent ${parentId}` : '');
-
             let query = `
                 SELECT 
                     c.*,
@@ -220,19 +207,12 @@ class Child {
             }
 
             const { rows } = await pool.query(query, values);
-            
-            if (rows.length === 0) {
-                console.log('No child found with ID:', childId);
-                return null;
-            }
-
-            console.log('Found child data:', rows[0]);
-            return rows[0];
+            return rows[0] || null;
         } catch (error) {
-            console.error('Error in findById:', error);
             throw new Error(`Error finding child: ${error.message}`);
         }
     }
+
     static async update(id, data, parentId) {
         const { name, age, username } = data;
         const query = `
@@ -250,24 +230,40 @@ class Child {
         }
     }
 
+    static async updatePassword(childId, newPassword) {
+        try {
+            const saltRounds = 10;
+            const passwordHash = await bcrypt.hash(newPassword, saltRounds);
+            
+            await pool.query(`
+                UPDATE children
+                SET password_hash = $1, updated_at = NOW()
+                WHERE id = $2
+            `, [passwordHash, childId]);
+            
+            return true;
+        } catch (error) {
+            throw new Error(`Error updating password: ${error.message}`);
+        }
+    }
+
     static async delete(id, parentId) {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
-            // Delete related data in correct order to respect foreign key constraints
-            const queries = [
+            const deletionQueries = [
                 'DELETE FROM chat_summaries WHERE child_id = $1',
                 'DELETE FROM chat_messages WHERE child_id = $1',
                 'DELETE FROM session_tracking WHERE child_id = $1',
                 'DELETE FROM long_term_memory_graph WHERE child_id = $1',
                 'DELETE FROM parental_controls WHERE child_id = $1',
                 'DELETE FROM conversations WHERE child_id = $1',
+                'DELETE FROM child_tos_acceptance WHERE child_id = $1',
                 'DELETE FROM children WHERE id = $1 AND parent_id = $2 RETURNING id'
             ];
 
-            // Execute all deletion queries
-            for (const query of queries) {
+            for (const query of deletionQueries) {
                 if (query.includes('parent_id')) {
                     await client.query(query, [id, parentId]);
                 } else {
@@ -277,16 +273,34 @@ class Child {
 
             await client.query('COMMIT');
             return { success: true };
-
         } catch (error) {
             await client.query('ROLLBACK');
-            console.error('Error in delete:', error);
             throw new Error(`Error deleting child account: ${error.message}`);
         } finally {
             client.release();
         }
     }
+
+    static async getTOSHistory(childId) {
+        try {
+            const { rows } = await pool.query(`
+                SELECT 
+                    tos_version,
+                    accepted_at,
+                    ip_address,
+                    user_agent
+                FROM child_tos_acceptance
+                WHERE child_id = $1
+                ORDER BY accepted_at DESC
+            `, [childId]);
+            
+            return rows;
+        } catch (error) {
+            throw new Error(`Error fetching TOS history: ${error.message}`);
+        }
+    }
 }
+
 function formatTimestamp(timestamp) {
     const now = new Date();
     const date = new Date(timestamp);
@@ -299,4 +313,5 @@ function formatTimestamp(timestamp) {
         return `${diffDays} days ago`;
     }
 }
+
 module.exports = Child;

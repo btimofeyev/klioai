@@ -4,7 +4,6 @@ const ChatModel = require('../models/chatModel');
 const LongTermMemoryModel = require('../models/longTermMemoryModel');
 const ParentalControl = require('../models/parentalControlModel');
 
-// Helper functions
 const helpers = {
     verifyParentAccess: async (childId, parentId) => {
         const child = await Child.findById(childId, parentId);
@@ -22,7 +21,7 @@ const helpers = {
     },
 
     handleError: (res, error, status = 500) => {
-        console.error(`Error: ${error.message}`, error);
+        console.error(`Error: ${error.message}`);
         res.status(status).json({
             success: false,
             message: error.message || 'An unexpected error occurred'
@@ -37,37 +36,66 @@ const helpers = {
             growth_areas: []
         };
 
-        if (memoryGraph.mainInterests.length > 0) {
+        if (memoryGraph.mainInterests?.length > 0) {
             patterns.interests.push(`Shows strong interest in ${memoryGraph.mainInterests.join(', ')}`);
         }
 
-        Object.entries(memoryGraph.knowledgeGraph).forEach(([topic, data]) => {
+        Object.entries(memoryGraph.knowledgeGraph || {}).forEach(([topic, data]) => {
             if (data.engagement > 5) {
                 patterns.strengths.push(`Demonstrates deep understanding of ${topic}`);
             }
-            if (data.details.knowledge_bits.length > 3) {
+            if (data.details?.knowledge_bits?.length > 3) {
                 patterns.engagement.push(`Shows consistent engagement with ${topic}`);
             }
-            if (data.engagement < 3 && data.details.sub_topics.length > 0) {
+            if (data.engagement < 3 && data.details?.sub_topics?.length > 0) {
                 patterns.growth_areas.push(`Could explore more aspects of ${topic}`);
             }
         });
 
         return patterns;
+    },
+
+    validateChildData: (data) => {
+        const errors = [];
+
+        if (!data.name?.trim()) {
+            errors.push('Name is required');
+        }
+
+        if (!data.age || data.age < 5 || data.age > 17) {
+            errors.push('Age must be between 5 and 17');
+        }
+
+        if (!data.username?.trim()) {
+            errors.push('Username is required');
+        }
+
+        if (!data.password || data.password.length < 8) {
+            errors.push('Password must be at least 8 characters long');
+        }
+
+        if (!data.tosAcceptance) {
+            errors.push('Terms of Service acceptance is required');
+        }
+
+        if (errors.length > 0) {
+            throw new Error(errors.join('. '));
+        }
     }
 };
 
 const childController = {
-
     async createChild(req, res) {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
             
             const parentId = req.user.id;
-            console.log('Creating child with parent ID:', parentId);
+            
+            // Validate input data
+            helpers.validateChildData(req.body);
 
-            // Get parent's plan type and validate limits
+            // Check plan limits
             const { rows: [parent] } = await client.query(`
                 SELECT 
                     u.plan_type,
@@ -88,18 +116,6 @@ const childController = {
                 throw new Error(`Your ${effectivePlanType === 'familypro' ? 'Family Pro' : 'Single'} plan allows up to ${maxChildren} child ${maxChildren === 1 ? 'account' : 'accounts'}. Please upgrade your plan to add more children.`);
             }
 
-            // Validate input
-            if (!req.body.password || req.body.password.length < 8) {
-                throw new Error('Password must be at least 8 characters long');
-            }
-
-            const requiredFields = ['name', 'age', 'username'];
-            for (const field of requiredFields) {
-                if (!req.body[field]) {
-                    throw new Error(`${field} is required`);
-                }
-            }
-
             // Check username availability
             const existingChild = await client.query(
                 'SELECT id FROM children WHERE username = $1',
@@ -110,19 +126,18 @@ const childController = {
                 throw new Error('Username is already taken');
             }
 
-            // Create child account with parental controls
-            const { child, controls } = await Child.create({
-                name: req.body.name,
-                age: req.body.age,
-                username: req.body.username,
-                password: req.body.password,
-                parentalControls: {
-                    filterInappropriate: req.body.parentalControls?.filterInappropriate ?? true,
-                    dailyMessageLimit: req.body.parentalControls?.dailyMessageLimit ?? 50,
-                    allowedStartTime: req.body.parentalControls?.allowedStartTime ?? '09:00:00',
-                    allowedEndTime: req.body.parentalControls?.allowedEndTime ?? '21:00:00'
-                }
-            }, parentId);
+            // Create child account with TOS acceptance
+            const { child, controls } = await Child.createWithTOS(
+                {
+                    name: req.body.name,
+                    age: req.body.age,
+                    username: req.body.username,
+                    password: req.body.password,
+                    parentalControls: req.body.parentalControls
+                },
+                parentId,
+                req.body.tosAcceptance
+            );
 
             await client.query('COMMIT');
             
@@ -149,56 +164,46 @@ const childController = {
     },
 
     async updateChild(req, res) {
+        const client = await pool.connect();
         try {
             const { id: parentId } = req.user;
             const childId = req.params.id;
             
             await helpers.verifyParentAccess(childId, parentId);
+            await client.query('BEGIN');
 
             // Update basic information
-            const updatedChild = await pool.query(
-                `UPDATE children 
-                 SET name = $1, 
-                     age = $2,
-                     updated_at = NOW()
-                 WHERE id = $3 AND parent_id = $4
-                 RETURNING *`,
-                [req.body.name, req.body.age, childId, parentId]
-            );
+            const updatedChild = await Child.update(childId, {
+                name: req.body.name,
+                age: req.body.age,
+                username: req.body.username
+            }, parentId);
 
+            if (!updatedChild) {
+                throw new Error('Failed to update child information');
+            }
+
+            // Update password if provided
             if (req.body.password) {
                 await Child.updatePassword(childId, req.body.password);
             }
 
             // Update parental controls if provided
             if (req.body.parentalControls) {
-                await pool.query(
-                    `UPDATE parental_controls
-                     SET filter_inappropriate = $1,
-                         message_limit = $2,
-                         allowed_start_time = $3,
-                         allowed_end_time = $4,
-                         updated_at = NOW()
-                     WHERE child_id = $5`,
-                    [
-                        req.body.parentalControls.filterInappropriate,
-                        req.body.parentalControls.dailyMessageLimit,
-                        req.body.parentalControls.allowedStartTime,
-                        req.body.parentalControls.allowedEndTime,
-                        childId
-                    ]
-                );
+                await ParentalControl.update(childId, req.body.parentalControls);
             }
 
             // Get updated data
-            const [updatedChildData, controls] = await Promise.all([
+            const [childData, controls] = await Promise.all([
                 Child.findById(childId, parentId),
                 ParentalControl.findByChildId(childId)
             ]);
 
+            await client.query('COMMIT');
+
             helpers.handleResponse(res, {
                 child: {
-                    ...updatedChildData,
+                    ...childData,
                     parentalControls: {
                         filterInappropriate: controls.filter_inappropriate,
                         dailyMessageLimit: controls.message_limit,
@@ -208,7 +213,10 @@ const childController = {
                 }
             });
         } catch (error) {
+            await client.query('ROLLBACK');
             helpers.handleError(res, error, 400);
+        } finally {
+            client.release();
         }
     },
 
@@ -259,7 +267,6 @@ const childController = {
             const { id: parentId } = req.user;
             const childId = req.params.id;
 
-            // Get child data and controls
             const [child, controls] = await Promise.all([
                 Child.findById(childId, parentId),
                 ParentalControl.findByChildId(childId)
@@ -269,7 +276,6 @@ const childController = {
                 throw new Error('Child not found');
             }
 
-            // Get profile enhancements
             const [summaries, memoryGraph] = await Promise.all([
                 ChatModel.getSummaries(childId),
                 LongTermMemoryModel.getChildMemoryGraph(childId)
@@ -279,14 +285,14 @@ const childController = {
                 ...child,
                 summaries,
                 memory: {
-                    mainInterests: memoryGraph.mainInterests,
-                    recentLearning: memoryGraph.recentLearning,
-                    topics: Object.entries(memoryGraph.knowledgeGraph).map(([topic, data]) => ({
+                    mainInterests: memoryGraph.mainInterests || [],
+                    recentLearning: memoryGraph.recentLearning || [],
+                    topics: Object.entries(memoryGraph.knowledgeGraph || {}).map(([topic, data]) => ({
                         name: topic,
                         engagement: data.engagement,
-                        knowledge: data.details.knowledge_bits,
-                        subTopics: data.details.sub_topics,
-                        relatedInterests: data.details.related_interests
+                        knowledge: data.details?.knowledge_bits || [],
+                        subTopics: data.details?.sub_topics || [],
+                        relatedInterests: data.details?.related_interests || []
                     }))
                 },
                 learningPatterns: helpers.analyzeLearningPatterns(memoryGraph)
@@ -298,18 +304,17 @@ const childController = {
         }
     },
 
-    async getProfile(req, res) {
+    async getChildProfile(req, res) {
         try {
             if (req.user.role !== 'child') {
                 throw new Error('Access denied: Child profile only accessible by child users');
             }
 
-            const childId = req.user.id || req.user.userId;
+            const childId = req.user.id;
             if (!childId) {
                 throw new Error('Child ID not found in token');
             }
 
-            // Get profile data
             const [childData, controls] = await Promise.all([
                 Child.findById(childId),
                 ParentalControl.findByChildId(childId)
@@ -319,7 +324,6 @@ const childController = {
                 throw new Error('Child profile not found');
             }
 
-            // Calculate remaining time
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
 
@@ -366,7 +370,20 @@ const childController = {
         }
     },
 
-    // Memory and Learning Methods
+    async getChildTOSHistory(req, res) {
+        try {
+            const { id: parentId } = req.user;
+            const childId = req.params.id;
+
+            await helpers.verifyParentAccess(childId, parentId);
+            const history = await Child.getTOSHistory(childId);
+            
+            helpers.handleResponse(res, { history });
+        } catch (error) {
+            helpers.handleError(res, error);
+        }
+    },
+
     async getChildSummaries(req, res) {
         try {
             const { id: parentId } = req.user;

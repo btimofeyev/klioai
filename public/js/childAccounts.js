@@ -277,10 +277,26 @@ class ChildAccountManager {
 
     async handleAddChild(e, modal) {
         e.preventDefault();
+        const originalForm = e.target;
+    
+        // Get client IP from a service like ipify if needed
+        const clientIP = await fetch('https://api.ipify.org?format=json')
+            .then(res => res.json())
+            .then(data => data.ip)
+            .catch(() => null);
         
         this.showTermsOfServiceModal(async () => {
             try {
-                const childData = this.getFormData(e.target);
+                const childData = this.getFormData(originalForm);
+                
+                // Add TOS acceptance data
+                childData.tosAcceptance = {
+                    version: 'v1.0', // Update this when TOS changes
+                    timestamp: new Date().toISOString(),
+                    ipAddress: clientIP,
+                    userAgent: navigator.userAgent
+                };
+                
                 const result = await this.makeRequest('/api/children', {
                     method: 'POST',
                     body: JSON.stringify(childData)
