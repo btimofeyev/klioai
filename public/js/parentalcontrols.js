@@ -1,8 +1,8 @@
 class ParentalControls {
     constructor() {
+        this.currentChildId = null;
         this.initializeElements();
         this.attachEventListeners();
-        this.currentChildId = null;
     }
 
     initializeElements() {
@@ -15,7 +15,6 @@ class ParentalControls {
             allowedEndTime: document.getElementById('allowedEndTime'),
             saveButton: document.getElementById('saveControls')
         };
-
         this.loadChildren();
     }
 
@@ -26,19 +25,16 @@ class ParentalControls {
                     'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 }
             });
-
             const data = await response.json();
 
             if (data.success && data.children) {
                 this.elements.childSelect.innerHTML = `
                     <option value="">Select a child</option>
-                    ${data.children.map(child => `
-                        <option value="${child.id}">${child.name}</option>
-                    `).join('')}
+                    ${data.children.map(child => `<option value="${child.id}">${child.name}</option>`).join('')}
                 `;
             }
         } catch (error) {
-            console.error('Error loading children:', error);
+            // Optional: show a notification to the user
         }
     }
 
@@ -60,34 +56,29 @@ class ParentalControls {
         try {
             await this.loadChildControls(childId);
         } catch (error) {
-            console.error('Error loading child data:', error);
+            // Optional: show a notification to the user
         }
     }
 
     async loadChildControls(childId) {
         try {
-            console.log('Fetching controls for child:', childId);
             const response = await fetch(`/api/parental-controls/children/${childId}/controls`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                 }
             });
-
             const data = await response.json();
-            console.log('Received controls data:', data);
-
             if (data.success) {
                 this.updateUI(data.controls);
             } else {
                 throw new Error(data.message || 'Failed to load controls');
             }
         } catch (error) {
-            console.error('Error loading controls:', error);
+            // Optional: show a notification to the user
         }
     }
 
     updateUI(controls) {
-        console.log('Updating UI with controls:', controls);
         this.elements.filterInappropriate.checked = controls.filterInappropriate;
         this.elements.blockPersonalInfo.checked = controls.blockPersonalInfo;
         this.elements.messageLimit.value = controls.messageLimit.toString();
@@ -117,13 +108,12 @@ class ParentalControls {
             });
 
             const data = await response.json();
-
             if (!data.success) {
                 throw new Error(data.message || 'Failed to update controls');
             }
+
             alert('Parental controls updated successfully!');
         } catch (error) {
-            console.error('Error saving controls:', error);
             alert('Failed to update parental controls. Please try again.');
         }
     }
@@ -138,7 +128,6 @@ class ParentalControls {
     }
 }
 
-// Initialize when document is ready
 document.addEventListener('DOMContentLoaded', () => {
     if (document.getElementById('controls')) {
         new ParentalControls();

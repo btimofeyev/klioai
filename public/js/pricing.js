@@ -5,12 +5,12 @@ const stripe = Stripe('pk_test_51MqUNDDII9A9349owycaeVLhmzrRqXdymrMIbdWLMTnMepOT
 const PLANS = {
   single: {
     name: 'Single Account Plan',
-    priceId: 'price_1QP9N4DII9A9349ohlOJgJEE',
+    priceId: 'price_1QVLU5DII9A9349o7xJSR3OZ',
     price: 9.99
   },
   familypro: {
     name: 'Family Pro Account Plan',
-    priceId: 'price_1QP9NLDII9A9349oDRxFpdWx',
+    priceId: 'price_1QVLUbDII9A9349oEK9fzVp1',
     price: 19.99
   }
 };

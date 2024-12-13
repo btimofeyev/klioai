@@ -4,11 +4,11 @@ const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const User = require('../models/userModel');
 const PLANS = {
     single: {
-        priceId: 'price_1QP9N4DII9A9349ohlOJgJEE',
+        priceId: 'price_1QVLU5DII9A9349o7xJSR3OZ',
         name: 'Single Account Plan'
     },
     familypro: {
-        priceId: 'price_1QP9NLDII9A9349oDRxFpdWx',
+        priceId: 'price_1QVLUbDII9A9349oEK9fzVp1',
         name: 'Family Pro Account Plan'
     }
 };

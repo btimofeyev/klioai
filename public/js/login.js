@@ -1,8 +1,6 @@
 let selectedRole = null;
 const isDevelopment = window.location.hostname === 'localhost';
-const API_URL = isDevelopment 
-    ? 'http://localhost:3000' 
-    : '';
+const API_URL = isDevelopment ? 'http://localhost:3000' : '';
 const GOOGLE_CLIENT_ID = '459287730958-961bog884pu7h8kr1ir02ifnovbbfire.apps.googleusercontent.com'; 
 
 function initGoogleAuth() {
@@ -29,7 +27,7 @@ function selectRole(role) {
     const modalContent = document.getElementById('modalContent');
 
     modalTitle.textContent = `${role === 'parent' ? 'Parent' : 'Child'} Login`;
-    
+
     if (role === 'parent') {
         modalContent.innerHTML = `
             <div class="modal-body">
@@ -45,7 +43,6 @@ function selectRole(role) {
             </div>
         `;
         
-        // Render the Google Sign-In button
         google.accounts.id.renderButton(
             document.getElementById('googleSignInButton'),
             { 
@@ -66,17 +63,11 @@ function selectRole(role) {
                 </div>
                 <form id="childLoginForm" class="login-form">
                     <div class="form-group">
-                        <label for="username">
-                            <i class="fas fa-user"></i>
-                            Username
-                        </label>
+                        <label for="username"><i class="fas fa-user"></i> Username</label>
                         <input type="text" id="username" name="username" required>
                     </div>
                     <div class="form-group">
-                        <label for="password">
-                            <i class="fas fa-lock"></i>
-                            Password
-                        </label>
+                        <label for="password"><i class="fas fa-lock"></i> Password</label>
                         <input type="password" id="password" name="password" required>
                     </div>
                     <button type="submit" class="btn btn--primary">
@@ -86,45 +77,28 @@ function selectRole(role) {
                 </form>
             </div>
         `;
-
-        // Add event listener for child login form
         document.getElementById('childLoginForm').addEventListener('submit', handleChildLogin);
     }
 
     modal.style.display = 'flex';
 }
+
 async function handleChildLogin(event) {
     event.preventDefault();
-    
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
     try {
-        console.log('Attempting login at:', `${API_URL}/api/auth/child-login`);
-        
         const response = await fetch(`${API_URL}/api/auth/child-login`, {
-
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                username,
-                password
-            })
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ username, password })
         });
 
-        console.log('Response status:', response.status);
-        
         const data = await response.json();
-        console.log('Login response:', data);
-        
         if (data.success) {
             localStorage.setItem('authToken', data.token);
             localStorage.setItem('userData', JSON.stringify(data.user));
-            
-            // Change this to the absolute path
             window.location.href = '/chat.html';
         } else {
             throw new Error(data.error || 'Login failed');
@@ -134,13 +108,12 @@ async function handleChildLogin(event) {
         showError(error.message || 'Login failed. Please check your username and password.');
     }
 }
+
 async function handleGoogleSignIn(response) {
     try {
         const result = await fetch(`${API_URL}/api/auth/login`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 token: response.credential,
                 role: selectedRole
@@ -148,19 +121,15 @@ async function handleGoogleSignIn(response) {
         });
 
         const data = await result.json();
-        
         if (data.success) {
             localStorage.setItem('authToken', data.token);
             localStorage.setItem('userData', JSON.stringify(data.user));
-            
-            // Redirect based on role
             if (selectedRole === 'parent') {
                 window.location.href = '/dashboard.html';
             } else {
                 window.location.href = '/chat';
             }
         } else {
-            // Show the error message returned from the server
             throw new Error(data.error || 'Authentication failed');
         }
     } catch (error) {
@@ -168,6 +137,7 @@ async function handleGoogleSignIn(response) {
         showError(error.message || 'Authentication failed. Please try again.');
     }
 }
+
 function showError(message) {
     const modalContent = document.getElementById('modalContent');
     modalContent.innerHTML += `
@@ -178,14 +148,11 @@ function showError(message) {
 }
 
 function closeModal() {
-    const modal = document.getElementById('loginModal');
-    modal.style.display = 'none';
+    document.getElementById('loginModal').style.display = 'none';
 }
 
-// Initialize Google Auth when the page loads
 document.addEventListener('DOMContentLoaded', initGoogleAuth);
 
-// Add event listener for closing modal when clicking outside
 window.addEventListener('click', (event) => {
     const modal = document.getElementById('loginModal');
     if (event.target === modal) {

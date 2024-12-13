@@ -1,13 +1,12 @@
 class ChildAccountManager {
     constructor() {
-        if (window.childAccountManager) {
-            console.warn('ChildAccountManager already initialized');
-            return window.childAccountManager;
-        }
+        if (window.childAccountManager) return window.childAccountManager;
         
         this.initialized = false;
         this.initializeElements();
         this.initialize();
+        
+        // Initialize Stripe with your public key
         this.stripe = Stripe('pk_test_51MqUNDDII9A9349owycaeVLhmzrRqXdymrMIbdWLMTnMepOTS8XyIfsQkX5ojooPcIKyhNWJl1fj595Rp8BqczKM00zMzj9coJ');
 
         window.childAccountManager = this;
@@ -16,23 +15,17 @@ class ChildAccountManager {
     // Initialization Methods
     initializeElements() {
         this.childrenGrid = document.getElementById('childrenGrid');
-        if (!this.childrenGrid) {
-            console.warn('ChildrenGrid element not found initially - will be created if needed');
-        }
     }
 
     initialize() {
         if (this.initialized) return;
-
         this.setupEventListeners();
         this.loadChildren();
         this.checkUpgradeSuccess();
-        
         this.initialized = true;
-        console.log('ChildAccountManager initialized');
     }
+
     setupEventListeners() {
-        // Add upgrade button listener
         const sidebarUpgradeBtn = document.querySelector('.upgrade-to-pro');
         if (sidebarUpgradeBtn) {
             sidebarUpgradeBtn.addEventListener('click', (e) => this.handleUpgradeClick(e));
@@ -43,40 +36,35 @@ class ChildAccountManager {
         e.preventDefault();
         try {
             const userData = JSON.parse(localStorage.getItem('userData'));
-            console.log('Retrieved userData:', userData); // Debug log
-    
+
             if (!userData || !userData.stripe_customer_id) {
-                // Check specifically what's missing
-                console.log('Missing userData:', !userData);
-                console.log('Missing stripe_customer_id:', userData && !userData.stripe_customer_id);
                 throw new Error('User data not found. Please log in again.');
             }
-    
+
             const response = await this.makeRequest('/api/stripe/create-upgrade-session', {
                 method: 'POST',
                 body: JSON.stringify({
                     customerId: userData.stripe_customer_id,
-                    currentPlan: userData.plan_type || 'single' // Provide default if missing
+                    currentPlan: userData.plan_type || 'single'
                 })
             });
-    
+
             if (response.error) {
                 throw new Error(response.error);
             }
-    
-            // Redirect to Stripe checkout for upgrade
+
             const { error } = await this.stripe.redirectToCheckout({
                 sessionId: response.sessionId
             });
-    
+
             if (error) {
                 throw new Error(error.message);
             }
         } catch (error) {
-            console.error('Upgrade error:', error);
             this.showError(error.message || 'Unable to process upgrade. Please try again later.');
         }
     }
+
     // API Methods
     async makeRequest(endpoint, options = {}) {
         const token = Utils.getAuthToken();
@@ -106,7 +94,6 @@ class ChildAccountManager {
 
             return await response.json();
         } catch (error) {
-            console.error('API Error:', error);
             throw error;
         }
     }
@@ -114,7 +101,6 @@ class ChildAccountManager {
     async loadChildren() {
         try {
             const data = await this.makeRequest('/api/children');
-            
             if (data?.success) {
                 this.renderChildren(data.children);
                 this.updateAddChildButton(data.children.length, data.planType);
@@ -127,7 +113,6 @@ class ChildAccountManager {
     async editChild(childId) {
         try {
             const data = await this.makeRequest(`/api/children/${childId}`);
-            
             if (!data?.success || !data.child) {
                 throw new Error('Failed to fetch child data');
             }
@@ -224,16 +209,12 @@ class ChildAccountManager {
             addChildSection.className = 'add-child-section';
             childrenSection.appendChild(addChildSection);
         }
-    
-        if (!addChildSection) {
-            console.error('Could not find or create add-child-section');
-            return;
-        }
-    
+
+        if (!addChildSection) return;
+
         const maxChildren = planType === 'familypro' ? 3 : 1;
         addChildSection.innerHTML = this.getAddButtonHtml(childCount, maxChildren, planType);
         
-        // Add event listener to the newly created button
         const addChildBtn = document.getElementById('addChildBtn');
         if (addChildBtn) {
             addChildBtn.addEventListener('click', this.handleAddChildClick.bind(this));
@@ -246,16 +227,16 @@ class ChildAccountManager {
             }
         }
     }
+
     checkUpgradeSuccess() {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('upgrade_success') === 'true') {
             this.showSuccess('Successfully upgraded to Family Pro! Enjoy your new features.');
-            // Remove the query parameter
             window.history.replaceState({}, '', window.location.pathname);
-            // Reload children to update UI
             this.loadChildren();
         }
     }
+
     getAddButtonHtml(childCount, maxChildren, planType) {
         if (childCount >= maxChildren) {
             return `
@@ -282,12 +263,9 @@ class ChildAccountManager {
             </button>
         `;
     }
-    renderChildren(children) {
-        if (!Array.isArray(children)) {
-            console.error('Children data is not an array:', children);
-            return;
-        }
 
+    renderChildren(children) {
+        if (!Array.isArray(children)) return;
         this.childrenGrid.innerHTML = children.map(child => this.createChildCard(child)).join('');
         this.attachCardEventListeners();
     }
@@ -425,22 +403,22 @@ class ChildAccountManager {
                 <div class="form-row">
                     <div class="form-field">
                         <label for="${uniquePrefix}_name">Child's Name</label>
-                        <input type="text" 
-                               id="${uniquePrefix}_name" 
-                               name="name" 
-                               required 
+                        <input type="text"
+                               id="${uniquePrefix}_name"
+                               name="name"
+                               required
                                placeholder="Enter child's name"
                                value="${existingChild ? existingChild.name : ''}"
                                autocomplete="off">
                     </div>
                     <div class="form-field">
                         <label for="${uniquePrefix}_age">Age</label>
-                        <input type="number" 
-                               id="${uniquePrefix}_age" 
-                               name="age" 
-                               min="5" 
-                               max="17" 
-                               required 
+                        <input type="number"
+                               id="${uniquePrefix}_age"
+                               name="age"
+                               min="5"
+                               max="17"
+                               required
                                placeholder="Age (5-17)"
                                value="${existingChild ? existingChild.age : ''}">
                     </div>
@@ -448,6 +426,7 @@ class ChildAccountManager {
             </div>
         `;
     }
+
     getCredentialsFormHtml(uniquePrefix, existingChild) {
         return `
             <div class="form-card">
@@ -458,10 +437,10 @@ class ChildAccountManager {
                 <div class="form-row">
                     <div class="form-field">
                         <label for="${uniquePrefix}_username">Username</label>
-                        <input type="text" 
-                               id="${uniquePrefix}_username" 
-                               name="username" 
-                               required 
+                        <input type="text"
+                               id="${uniquePrefix}_username"
+                               name="username"
+                               required
                                placeholder="Choose a username"
                                value="${existingChild ? existingChild.username : ''}"
                                ${existingChild ? 'readonly' : ''}
@@ -475,9 +454,9 @@ class ChildAccountManager {
                             ${existingChild ? 'New Password (leave blank to keep current)' : 'Password'}
                         </label>
                         <div class="password-input-group">
-                            <input type="password" 
-                                   id="${uniquePrefix}_password" 
-                                   name="password" 
+                            <input type="password"
+                                   id="${uniquePrefix}_password"
+                                   name="password"
                                    ${existingChild ? '' : 'required'}
                                    placeholder="${existingChild ? 'Enter new password (optional)' : 'Create a password'}">
                             <button type="button" class="toggle-password" aria-label="Toggle password visibility">
@@ -500,12 +479,12 @@ class ChildAccountManager {
                 <div class="form-row">
                     <div class="form-field">
                         <label for="${uniquePrefix}_msg_limit">Daily Message Limit</label>
-                        <input type="number" 
-                               id="${uniquePrefix}_msg_limit" 
-                               name="daily_message_limit" 
-                               min="10" 
-                               max="200" 
-                               value="${existingChild ? existingChild.parentalControls.dailyMessageLimit : '50'}" 
+                        <input type="number"
+                               id="${uniquePrefix}_msg_limit"
+                               name="daily_message_limit"
+                               min="10"
+                               max="200"
+                               value="${existingChild ? existingChild.parentalControls.dailyMessageLimit : '50'}"
                                required>
                         <span class="input-suffix">messages per day</span>
                     </div>
@@ -516,18 +495,18 @@ class ChildAccountManager {
                         <div class="time-range-group">
                             <div class="time-input">
                                 <label for="${uniquePrefix}_start_time">From</label>
-                                <input type="time" 
-                                       id="${uniquePrefix}_start_time" 
-                                       name="allowedStartTime" 
-                                       value="${existingChild ? existingChild.parentalControls.allowedStartTime : '09:00'}" 
+                                <input type="time"
+                                       id="${uniquePrefix}_start_time"
+                                       name="allowedStartTime"
+                                       value="${existingChild ? existingChild.parentalControls.allowedStartTime : '09:00'}"
                                        required>
                             </div>
                             <div class="time-input">
                                 <label for="${uniquePrefix}_end_time">To</label>
-                                <input type="time" 
-                                       id="${uniquePrefix}_end_time" 
-                                       name="allowedEndTime" 
-                                       value="${existingChild ? existingChild.parentalControls.allowedEndTime : '21:00'}" 
+                                <input type="time"
+                                       id="${uniquePrefix}_end_time"
+                                       name="allowedEndTime"
+                                       value="${existingChild ? existingChild.parentalControls.allowedEndTime : '21:00'}"
                                        required>
                             </div>
                         </div>
@@ -536,9 +515,9 @@ class ChildAccountManager {
                 <div class="form-row">
                     <div class="form-field checkbox-field">
                         <label class="checkbox-label">
-                            <input type="checkbox" 
-                                   id="${uniquePrefix}_filter" 
-                                   name="filterInappropriate" 
+                            <input type="checkbox"
+                                   id="${uniquePrefix}_filter"
+                                   name="filterInappropriate"
                                    ${existingChild && existingChild.parentalControls.filterInappropriate ? 'checked' : 'checked'}>
                             <span class="checkbox-text">Filter Inappropriate Content</span>
                         </label>
@@ -572,8 +551,8 @@ class ChildAccountManager {
                         
                         <div class="confirmation-input mt-4">
                             <label>Type "DELETE" to confirm:</label>
-                            <input type="text" 
-                                   id="deleteConfirmInput" 
+                            <input type="text"
+                                   id="deleteConfirmInput"
                                    class="border rounded p-2 mt-2 w-full"
                                    placeholder="Type DELETE to confirm">
                         </div>
@@ -582,9 +561,9 @@ class ChildAccountManager {
                             <button type="button" class="btn btn-secondary" data-close-modal>
                                 Cancel
                             </button>
-                            <button type="button" 
-                                    class="btn btn-danger" 
-                                    id="confirmDeleteBtn" 
+                            <button type="button"
+                                    class="btn btn-danger"
+                                    id="confirmDeleteBtn"
                                     disabled>
                                 Delete Account
                             </button>
@@ -621,19 +600,15 @@ class ChildAccountManager {
             if (e.target === modal) this.closeModal(modal);
         });
     }
+
     // Utility Methods
     attachCardEventListeners() {
         // View buttons
         document.querySelectorAll('.view-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const childId = e.currentTarget.dataset.childId;
-                // Switch to chats section
                 const chatsSection = document.querySelector('[data-section="chats"]');
-                if (chatsSection) {
-                    chatsSection.click();
-                }
-    
-                // Select the child in the dropdown
+                if (chatsSection) chatsSection.click();
                 const chatChildFilter = document.getElementById('chatChildFilter');
                 if (chatChildFilter) {
                     chatChildFilter.value = childId;
@@ -654,13 +629,8 @@ class ChildAccountManager {
         document.querySelectorAll('.settings-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const childId = e.currentTarget.dataset.childId;
-                // Switch to controls section
                 const controlsSection = document.querySelector('[data-section="controls"]');
-                if (controlsSection) {
-                    controlsSection.click();
-                }
-    
-                // Select the child in the dropdown
+                if (controlsSection) controlsSection.click();
                 const controlsChildFilter = document.getElementById('controlsChildFilter');
                 if (controlsChildFilter) {
                     controlsChildFilter.value = childId;
@@ -748,7 +718,6 @@ class ChildAccountManager {
         });
     }
 }
-
 
 document.addEventListener('DOMContentLoaded', () => {
     window.childAccountManager = new ChildAccountManager();
