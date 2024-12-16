@@ -62,8 +62,8 @@ document.querySelectorAll('.features-section__card').forEach(card => {
 
 // Stats Data
 const stats = [
-    { number: '5K+', label: 'Happy Learners' },
-    { number: '150K+', label: 'Learning Conversations' },
+    { number: '1K+', label: 'Happy Learners' },
+    { number: '10K+', label: 'Learning Conversations' },
     { number: '25+', label: 'Subject Areas' },
     { number: '99%', label: 'Parent Trust Rating' }
 ];
@@ -114,7 +114,11 @@ const footerBrand = {
 
 const footerLinks = {
     title: 'Company',
-    links: ['Features', 'Contact Us', 'Privacy Policy', 'Terms of Use']
+    links: [
+        { text: 'Features', href: '/#features' },
+        { text: 'Contact Us', href: 'mailto:support@klioai.com' },
+        { text: 'Legal & Privacy', href: '/legal.html' }
+    ]
 };
 
 // Populate Footer
@@ -122,6 +126,8 @@ document.getElementById('footer-brand').innerHTML = footerBrand.content;
 document.getElementById('footer-links').innerHTML = `
     <h3 class="footer__title">${footerLinks.title}</h3>
     <ul class="footer__list">
-        ${footerLinks.links.map(link => `<li><a href="#">${link}</a></li>`).join('')}
+        ${footerLinks.links.map(link => 
+            `<li><a href="${link.href}">${link.text}</a></li>`
+        ).join('')}
     </ul>
 `;
