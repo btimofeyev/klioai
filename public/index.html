@@ -25,7 +25,7 @@
                         Let your child explore a world of knowledge with Klio, their personal AI learning buddy. Engaging conversations, complete parental oversight, and endless adventures in learning.
                     </p>
                     <div class="button-group">
-                        <a href="signup.html" class="btn btn--primary">
+                        <a href="signup.html" class="btn btn--primary" onclick="trackCTA()">
                             Start Free Trial
                             <span>→</span>
                         </a>
@@ -114,5 +114,20 @@
         </div>
     </footer>
     <script src="js/main.js"></script>
+    <script type="text/javascript">
+        function trackCTA() {
+          twq('event', 'ClickCTA', {
+            conversion_id: 'free_trial_cta',
+            contents: [
+              {
+                content_name: 'Free Trial CTA',
+                content_type: 'button',
+                content_id: 'start_free_trial'
+              }
+            ]
+          });
+          console.log('Twitter Pixel: CTA Click Tracked');
+        }
+      </script>
 </body>
 </html>
