@@ -108,21 +108,34 @@ class User {
         plan_type = $1,
         subscription_status = $2,
         stripe_subscription_id = $3,
+        subscription_end_date = $4,
         updated_at = NOW()
-      WHERE stripe_customer_id = $4
+      WHERE stripe_customer_id = $5
       RETURNING *
     `;
+    
+    let subscriptionEndDate = null;
+    
+    // Set end date based on subscription state
+    if (subscription.trial_end) {
+      subscriptionEndDate = new Date(subscription.trial_end * 1000);
+    } else if (subscription.cancel_at) {
+      subscriptionEndDate = new Date(subscription.cancel_at * 1000);
+    } else if (subscription.current_period_end) {
+      subscriptionEndDate = new Date(subscription.current_period_end * 1000);
+    }
     
     const values = [
       planType,
       subscription.status,
       subscription.id,
+      subscriptionEndDate,
       subscription.customer
     ];
 
     const { rows } = await pool.query(query, values);
     return rows[0];
-  }
+}
 
   static async updateStripeInfo(userId, stripeData) {
     const {

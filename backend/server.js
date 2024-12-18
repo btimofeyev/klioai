@@ -72,6 +72,31 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
         await User.handleSubscriptionUpdate(updatedSubscription);
         break;
       }
+
+      case 'customer.subscription.trial_will_end': {
+        const subscription = event.data.object;
+        // Handle trial ending soon (3 days before)
+        await User.handleSubscriptionUpdate(subscription);
+        break;
+      }
+
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+        if (invoice.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+          await User.handleSubscriptionUpdate(subscription);
+        }
+        break;
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object;
+        if (invoice.subscription) {
+          const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
+          await User.handleSubscriptionUpdate(subscription);
+        }
+        break;
+      }
     }
 
     res.json({ received: true });
