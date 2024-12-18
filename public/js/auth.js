@@ -1,7 +1,7 @@
 const isDevelopment = window.location.hostname === 'localhost';
 const API_URL = isDevelopment ? 'http://localhost:3002' : 'https://klioai.com'; 
 const GOOGLE_CLIENT_ID = '459287730958-961bog884pu7h8kr1ir02ifnovbbfire.apps.googleusercontent.com';
-const stripe = Stripe('pk_test_51MqUNDDII9A9349owycaeVLhmzrRqXdymrMIbdWLMTnMepOTS8XyIfsQkX5ojooPcIKyhNWJl1fj595Rp8BqczKM00zMzj9coJ');
+const stripe = Stripe('pk_live_51MqUNDDII9A9349oqpvBurQTFSJgjUtr7FGkYtZ9I2iJqUGMObMqCYD4Aa5l3061bxybqh1kBQ9uqBxCOsbz4wjc00yR3R1yaC');
 
 let selectedPlan = null;
 
