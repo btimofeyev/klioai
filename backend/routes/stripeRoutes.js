@@ -13,63 +13,74 @@ const PLANS = {
     }
 };
 router.post('/create-checkout-session', async (req, res) => {
-    try {
-      const { plan, googleData } = req.body;
-      
-      if (!PLANS[plan]) {
-        return res.status(400).json({ error: 'Invalid plan selected' });
-      }
-  
-      // First check if user exists in our database
-      const user = await User.findByEmail(googleData.email);
-      let customer;
-  
-      if (user?.stripe_customer_id) {
-        // If user exists and has stripe ID, use that
-        customer = { id: user.stripe_customer_id };
-      } else {
-        // Otherwise check Stripe or create new customer
-        const existingCustomers = await stripe.customers.list({
-          email: googleData.email,
-          limit: 1
-        });
-  
-        if (existingCustomers.data.length > 0) {
-          customer = existingCustomers.data[0];
-        } else {
-          customer = await stripe.customers.create({
-            email: googleData.email,
-            metadata: {
-              google_id: googleData.googleId
-            }
-          });
-        }
-      }
-  
-      const session = await stripe.checkout.sessions.create({
-        customer: customer.id,
-        payment_method_types: ['card'],
-        line_items: [{
-          price: PLANS[plan].priceId,
-          quantity: 1
-        }],
-        mode: 'subscription',
-        metadata: {
-          google_id: googleData.googleId,
-          email: googleData.email,
-          name: googleData.name,
-          plan: plan
-        },
-        success_url: `${process.env.FRONTEND_URL}/signup.html?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.FRONTEND_URL}/signup.html`
-      });
-  
-      res.json({ sessionId: session.id });
-    } catch (error) {
-      console.error('Error creating checkout session:', error);
-      res.status(500).json({ error: error.message });
+  try {
+    const { plan, googleData } = req.body;
+    
+    if (!PLANS[plan]) {
+      return res.status(400).json({ error: 'Invalid plan selected' });
     }
-  });
+
+    // First check if user exists in our database
+    const user = await User.findByEmail(googleData.email);
+    let customer;
+
+    if (user?.stripe_customer_id) {
+      customer = { id: user.stripe_customer_id };
+    } else {
+      const existingCustomers = await stripe.customers.list({
+        email: googleData.email,
+        limit: 1
+      });
+
+      if (existingCustomers.data.length > 0) {
+        customer = existingCustomers.data[0];
+      } else {
+        customer = await stripe.customers.create({
+          email: googleData.email,
+          metadata: {
+            google_id: googleData.googleId
+          }
+        });
+      }
+    }
+
+    // Add trial period for single plan only
+    const subscription_data = plan === 'single' ? {
+      trial_period_days: 7,
+      metadata: {
+        plan: plan
+      }
+    } : {
+      metadata: {
+        plan: plan
+      }
+    };
+
+    const session = await stripe.checkout.sessions.create({
+      customer: customer.id,
+      payment_method_types: ['card'],
+      line_items: [{
+        price: PLANS[plan].priceId,
+        quantity: 1
+      }],
+      mode: 'subscription',
+      subscription_data,
+      metadata: {
+        google_id: googleData.googleId,
+        email: googleData.email,
+        name: googleData.name,
+        plan: plan
+      },
+      success_url: `${process.env.FRONTEND_URL}/signup.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/signup.html`
+    });
+
+    res.json({ sessionId: session.id });
+  } catch (error) {
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 router.get('/get-session', async (req, res) => {
   try {
       const { sessionId } = req.query;

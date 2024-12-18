@@ -90,9 +90,15 @@ body {
 
 .pricing-card__header {
     text-align: center;
-    margin-bottom: 1.75rem;
-    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+    padding-bottom: 2rem;
     border-bottom: 1px solid rgba(138, 43, 226, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.pricing-card.popular .plan-price {
+    color: #6366f1;
 }
 
 .plan-name {
@@ -111,29 +117,62 @@ body {
 }
 
 .plan-price {
-    font-size: 2.5rem;
-    font-weight: bold;
-    color: #333;
-    line-height: 1;
-    margin-bottom: 0.5rem;
     display: flex;
-    align-items: baseline;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1.5rem 0;
 }
-
-.plan-price .currency {
-    font-size: 1.25rem;
-    margin-right: 0.25rem;
-    color: #666;
+.plan-price .amount {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: #1f2937;
+    display: flex;
+    align-items: start;
+    line-height: 1;
+}
+.plan-price .amount::before {
+    content: "$";
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-right: 2px;
+    margin-top: 4px;
 }
 
 .plan-price .period {
-    font-size: 0.9375rem;
-    color: #666;
-    font-weight: normal;
-    margin-left: 0.25rem;
+    font-size: 1.125rem;
+    color: #6b7280;
+    font-weight: 500;
+}
+.pricing-card.popular .plan-price .amount {
+    background: linear-gradient(135deg, #8A2BE2, #64C7FF);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.trial-badge {
+    background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+    color: #1e40af;
+    font-weight: 600;
+    padding: 0.5rem 1rem;
+    border-radius: 999px;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
 }
 
+.trial-badge::before {
+    content: "✨";
+    font-size: 1rem;
+}
+
+.trial-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(37, 99, 235, 0.15);
+}
 .plan-description {
     font-size: 0.9375rem;
     color: #666;

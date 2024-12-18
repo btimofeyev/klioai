@@ -42,13 +42,13 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
         const session = event.data.object;
         const subscription = await stripe.subscriptions.retrieve(session.subscription);
         const priceId = subscription.items.data[0].price.id;
-
+      
         const planMap = {
           'price_1QP9N4DII9A9349ohlOJgJEE': 'single',
           'price_1QP9NLDII9A9349oDRxFpdWx': 'familypro'
         };
         const planType = planMap[priceId] || 'single';
-
+      
         const userData = {
           email: session.metadata.email,
           name: session.metadata.name,
@@ -56,9 +56,13 @@ app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res)
           plan: planType,
           google_id: session.metadata.google_id,
           stripe_customer_id: session.customer,
-          stripe_subscription_id: session.subscription
+          stripe_subscription_id: session.subscription,
+          subscription_status: subscription.status,
+          subscription_end_date: subscription.trial_end ? 
+            new Date(subscription.trial_end * 1000).toISOString() : 
+            null
         };
-
+      
         await User.handleStripeWebhook(userData);
         break;
       }

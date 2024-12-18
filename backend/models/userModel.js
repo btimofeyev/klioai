@@ -71,9 +71,10 @@ class User {
           stripe_customer_id = $1,
           stripe_subscription_id = $2,
           plan_type = $3,
-          subscription_status = 'active',
+          subscription_status = $4,
+          subscription_end_date = $5,
           updated_at = NOW()
-        WHERE id = $4
+        WHERE id = $6
         RETURNING *
       `;
       
@@ -81,6 +82,8 @@ class User {
         userData.stripe_customer_id,
         userData.stripe_subscription_id,
         userData.plan,
+        userData.subscription_status,
+        userData.subscription_end_date,
         user.id
       ];
   
@@ -89,6 +92,7 @@ class User {
     }
     return user;
   }
+  
   
   static async handleSubscriptionUpdate(subscription) {
     const priceId = subscription.items.data[0].price.id;
