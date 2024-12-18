@@ -25,8 +25,20 @@ router.post('/create-checkout-session', async (req, res) => {
     let customer;
 
     if (user?.stripe_customer_id) {
-      customer = { id: user.stripe_customer_id };
-    } else {
+      // First check if this customer still exists in Stripe
+      try {
+        customer = await stripe.customers.retrieve(user.stripe_customer_id);
+        if (customer.deleted) {
+          throw new Error('Customer was deleted');
+        }
+      } catch (error) {
+        // If customer doesn't exist in Stripe anymore, we'll create a new one
+        customer = null;
+      }
+    }
+
+    // If we don't have a valid customer yet, look up by email
+    if (!customer) {
       const existingCustomers = await stripe.customers.list({
         email: googleData.email,
         limit: 1
@@ -34,7 +46,18 @@ router.post('/create-checkout-session', async (req, res) => {
 
       if (existingCustomers.data.length > 0) {
         customer = existingCustomers.data[0];
+        
+        // Update our database with this customer ID if we didn't have it
+        if (user && !user.stripe_customer_id) {
+          await User.updateStripeInfo(user.id, {
+            customerId: customer.id,
+            subscriptionId: null,
+            status: 'active',
+            endDate: null
+          });
+        }
       } else {
+        // Only create a new customer if we couldn't find one
         customer = await stripe.customers.create({
           email: googleData.email,
           metadata: {
