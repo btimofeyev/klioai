@@ -569,14 +569,4 @@ body {
     }
 }
 
-/* Add Child Section */
-.add-child-section {
-    text-align: center;
-    margin: 2rem 0;
-}
 
-.add-child-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
