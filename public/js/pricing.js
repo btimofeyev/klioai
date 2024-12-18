@@ -1,6 +1,6 @@
 // frontend/pricing.js
 const API_URL = 'http://localhost:3000';
-const stripe = Stripe('pk_test_51MqUNDDII9A9349owycaeVLhmzrRqXdymrMIbdWLMTnMepOTS8XyIfsQkX5ojooPcIKyhNWJl1fj595Rp8BqczKM00zMzj9coJ');
+const stripe = Stripe('pk_live_51MqUNDDII9A9349oqpvBurQTFSJgjUtr7FGkYtZ9I2iJqUGMObMqCYD4Aa5l3061bxybqh1kBQ9uqBxCOsbz4wjc00yR3R1yaC');
 
 const PLANS = {
   single: {
