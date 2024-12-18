@@ -1,5 +1,6 @@
-// frontend/pricing.js
-const API_URL = 'http://localhost:3000';
+
+const isDevelopment = window.location.hostname === 'localhost';
+const API_URL = isDevelopment ? 'http://localhost:3000' : '';
 const stripe = Stripe('pk_live_51MqUNDDII9A9349oqpvBurQTFSJgjUtr7FGkYtZ9I2iJqUGMObMqCYD4Aa5l3061bxybqh1kBQ9uqBxCOsbz4wjc00yR3R1yaC');
 
 const PLANS = {
