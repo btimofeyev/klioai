@@ -1,19 +1,43 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Klio AI - Your Child's Smart Learning Companion</title>
-        <!-- Add favicon -->
-        <link rel="icon" href="imgs/logo.png" type="image/x-icon">
-        <link rel="stylesheet" href="css/styles.css">
-        <script>
-            !function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);
-            },s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',
-            a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
-            twq('config','ovkq8');
-            </script>
-    </head>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klio AI - Your Child's Smart Learning Companion</title>
+    <!-- Add favicon -->
+    <link rel="icon" href="imgs/logo.png" type="image/x-icon">
+    <link rel="stylesheet" href="css/styles.css">
+    <script>
+        !function (e, t, n, s, u, a) {
+            e.twq || (s = e.twq = function () {
+                s.exe ? s.exe.apply(s, arguments) : s.queue.push(arguments);
+            }, s.version = '1.1', s.queue = [], u = t.createElement(n), u.async = !0, u.src = 'https://static.ads-twitter.com/uwt.js',
+                a = t.getElementsByTagName(n)[0], a.parentNode.insertBefore(u, a))
+        }(window, document, 'script');
+        twq('config', 'ovkq8');
+    </script>
+    <!-- Meta Pixel Code -->
+    <script>
+        !function (f, b, e, v, n, t, s) {
+            if (f.fbq) return; n = f.fbq = function () {
+                n.callMethod ?
+                n.callMethod.apply(n, arguments) : n.queue.push(arguments)
+            };
+            if (!f._fbq) f._fbq = n; n.push = n; n.loaded = !0; n.version = '2.0';
+            n.queue = []; t = b.createElement(e); t.async = !0;
+            t.src = v; s = b.getElementsByTagName(e)[0];
+            s.parentNode.insertBefore(t, s)
+        }(window, document, 'script',
+            'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('init', '514747240852177');
+        fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+            src="https://www.facebook.com/tr?id=514747240852177&ev=PageView&noscript=1" /></noscript>
+    <!-- End Meta Pixel Code -->
+</head>
+
 <body>
     <div class="hero-section">
         <div class="container">
@@ -22,7 +46,8 @@
                     <div class="hero-section__badge">7-Day Free Trial Available</div>
                     <h1 class="hero-section__title">Meet Klio, Fun, Safe, Smart – Just for Kids.</h1>
                     <p class="hero-section__description">
-                        Let your child explore a world of knowledge with Klio, their personal AI learning buddy. Engaging conversations, complete parental oversight, and endless adventures in learning.
+                        Let your child explore a world of knowledge with Klio, their personal AI learning buddy.
+                        Engaging conversations, complete parental oversight, and endless adventures in learning.
                     </p>
                     <div class="button-group">
                         <a href="signup.html" class="btn btn--primary" onclick="trackCTA()">
@@ -35,7 +60,8 @@
                 <div>
                     <div class="chat">
                         <div class="chat__header">
-                            <div class="chat__avatar"><img src="imgs/logo.png" alt="Klio AI Logo" style="width: 100%; height: 100%;"></div>
+                            <div class="chat__avatar"><img src="imgs/logo.png" alt="Klio AI Logo"
+                                    style="width: 100%; height: 100%;"></div>
                             <div>
                                 <h3>Klio</h3>
                                 <p>Ready to explore history and more!</p>
@@ -48,7 +74,8 @@
                             Can you tell me about ancient Greece?
                         </div>
                         <div class="chat__message chat__message--ai">
-                            Of course! Ancient Greece was amazing! Did you know they had special goddesses called Muses who inspired learning and the arts? I'm named after Clio, the Muse of history! 🏺✨
+                            Of course! Ancient Greece was amazing! Did you know they had special goddesses called Muses
+                            who inspired learning and the arts? I'm named after Clio, the Muse of history! 🏺✨
                         </div>
                     </div>
                 </div>
@@ -83,14 +110,15 @@
         <div class="container" style="text-align: center;">
             <h2 class="section-title">Start Your Free 7-Day Adventure with Klio</h2>
             <p class="cta-section__description">
-                Join the growing community of families exploring knowledge with Klio, their trusted AI learning companion.
+                Join the growing community of families exploring knowledge with Klio, their trusted AI learning
+                companion.
             </p>
             <div class="button-group" style="justify-content: center;">
                 <a href="signup.html" class="btn btn--primary">
                     Try Klio Free for 7 Days
                     <span>→</span>
                 </a>
-            <!--     <a href="#" class="btn btn--outline">
+                <!--     <a href="#" class="btn btn--outline">
                     Watch Demo
                     <span>📚</span>
                 </a>-->
@@ -116,18 +144,19 @@
     <script src="js/main.js"></script>
     <script type="text/javascript">
         function trackCTA() {
-          twq('event', 'ClickCTA', {
-            conversion_id: 'free_trial_cta',
-            contents: [
-              {
-                content_name: 'Free Trial CTA',
-                content_type: 'button',
-                content_id: 'start_free_trial'
-              }
-            ]
-          });
-          console.log('Twitter Pixel: CTA Click Tracked');
+            twq('event', 'ClickCTA', {
+                conversion_id: 'free_trial_cta',
+                contents: [
+                    {
+                        content_name: 'Free Trial CTA',
+                        content_type: 'button',
+                        content_id: 'start_free_trial'
+                    }
+                ]
+            });
+            console.log('Twitter Pixel: CTA Click Tracked');
         }
-      </script>
+    </script>
 </body>
+
 </html>
