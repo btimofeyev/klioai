@@ -374,9 +374,9 @@ class ChatModel {
             }));
 
             const response = await openai.chat.completions.create({
-                model: "chatgpt-4o-latest",
+                model: "gpt-4o",
                 messages: [systemMessage, ...formattedMessages],
-                max_tokens: 550,
+                max_tokens: 1550,
                 temperature: 0.7,
             });
 
@@ -398,12 +398,12 @@ class ChatModel {
                 messages: [
                     {
                         role: "system",
-                        content: `Suggest 3 follow-up questions as JSON:
+                        content: `Suggest 3 follow-up suggestions as JSON:
                         {
                           "suggestions": [
-                            "Question 1?",
-                            "Question 2?",
-                            "Question 3?"
+                            "Suggestion 1",
+                            "Suggestion 2",
+                            "Suggestion 3"
                           ]
                         }`
                     },
