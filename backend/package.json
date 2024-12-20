@@ -17,8 +17,9 @@
     "google-auth-library": "^9.14.2",
     "jsonwebtoken": "^9.0.2",
     "node-cron": "^3.0.3",
-    "openai": "^4.71.1",
+    "openai": "^4.77.0",
     "pg": "^8.13.1",
-    "stripe": "^17.4.0"
+    "stripe": "^17.4.0",
+    "zod": "^3.24.1"
   }
 }

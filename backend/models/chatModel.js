@@ -343,17 +343,17 @@ class ChatModel {
         try {
             const LongTermMemoryModel = require("./longTermMemoryModel");
             const memoryGraph = await LongTermMemoryModel.getChildMemoryGraph(childData.id);
-
+    
             const recentMessages = messages.slice(-20);
             const filterSettings = await ContentFilter.getFilterSettings(childData.id);
-
+    
             const systemMessage = {
                 role: "system",
                 content: `You are Klio, a helpful, child-friendly AI assistant. 
                           Age: ${childData.age}. 
                           Interests: ${memoryGraph.mainInterests.join(", ")}.
                           Recent learning: ${memoryGraph.recentLearning.map(l => l.fact).join("; ")}.
-
+    
                           ${
                               filterSettings.filterInappropriate
                               ? `If topics are inappropriate, redirect the conversation to a safe topic.`
@@ -365,26 +365,23 @@ class ChatModel {
                               ? `Never request personal info. If shared, discourage it and redirect.`
                               : ''
                           }
-                          Keep responses friendly, educational, and age-appropriate.`
+                          Keep responses friendly, educational, and age-appropriate, and as concise as possible.`
             };
-
+    
             const formattedMessages = recentMessages.map(msg => ({
                 role: msg.role,
                 content: msg.content,
             }));
-
-            const response = await openai.chat.completions.create({
+    
+            const stream = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [systemMessage, ...formattedMessages],
                 max_tokens: 1550,
                 temperature: 0.7,
+                stream: true  // Enable streaming
             });
-
-            if (!response.choices[0]?.message?.content) {
-                throw new Error("No response generated");
-            }
-
-            return response.choices[0].message.content;
+    
+            return stream; // Return the stream instead of the response
         } catch (error) {
             console.error("Error generating AI response:", error);
             throw new Error("Failed to generate AI response");
@@ -398,35 +395,50 @@ class ChatModel {
                 messages: [
                     {
                         role: "system",
-                        content: `Suggest 3 follow-up suggestions as JSON:
+                        content: `Generate 3 potential questions or prompts that a ${childData.age}-year-old child might want to ask you based on the conversation.
+                        Rules:
+                        - These should be questions/prompts the child could ask YOU (the AI)
+                        - Keep them relevant to the previous response
+                        - Use child-friendly language
+                        - Make them interesting and engaging
+                        - No questions about personal information
+                        - Focus on exploration and learning
+                        - Keep them short and clear
+                        
+                        Return exactly 3 suggestions as JSON:
                         {
                           "suggestions": [
-                            "Suggestion 1",
-                            "Suggestion 2",
-                            "Suggestion 3"
+                            "suggestion 1",
+                            "suggestion 2",
+                            "suggestion 3"
                           ]
                         }`
                     },
                     {
                         role: "user",
-                        content: `Based on: "${aiResponse}"`
+                        content: `Based on your previous response: "${aiResponse}"\nGenerate engaging suggestions for what the child might want to ask or explore next.`
                     }
                 ],
                 max_tokens: 150,
                 temperature: 0.7,
             });
-
+    
             const rawContent = completion.choices[0].message.content.replace(/```json|```/g, "").trim();
             const suggestions = JSON.parse(rawContent).suggestions;
-
+    
             if (Array.isArray(suggestions)) {
-                return suggestions;
+                return suggestions.map(suggestion => {
+                    let formatted = suggestion.trim();
+                    formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+                    // Don't automatically add question marks as some might be prompts
+                    return formatted;
+                });
             } else {
-                return getDefaultSuggestions();
+                return getDefaultSuggestions(childData.age);
             }
         } catch (error) {
             console.error("Error generating suggestions:", error);
-            return getDefaultSuggestions();
+            return getDefaultSuggestions(childData.age);
         }
     }
 

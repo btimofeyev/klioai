@@ -3,11 +3,12 @@ const ChatState = {
     conversationId: null,
     isProcessing: false,
     darkMode: localStorage.getItem('darkMode') === 'true',
-    isInitialized: false,
+    isInitialized: false
 };
 
 const API = {
     baseUrl: window.location.hostname === 'localhost' ? 'http://localhost:3000/api' : '/api',
+    
     async request(endpoint, options = {}) {
         try {
             const authToken = localStorage.getItem('authToken');
@@ -36,6 +37,57 @@ const API = {
         }
     },
 
+    async stream(endpoint, data, onChunk) {
+        try {
+            const authToken = localStorage.getItem('authToken');
+            if (!authToken) throw new Error('No authentication token found');
+
+            const response = await fetch(`${this.baseUrl}${endpoint}`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                    'Accept': 'text/event-stream',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API Error:', errorText);
+                throw new Error(`Request failed: ${response.status}`);
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.slice(6));
+                            await onChunk(data);
+                        } catch (e) {
+                            console.error('Error parsing SSE data:', e);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('API Streaming Error:', error);
+            throw error;
+        }
+    },
+
     get(endpoint) {
         return this.request(endpoint, { method: 'GET' });
     },
@@ -60,7 +112,6 @@ const UI = {
             'newConversationBtn',
             'themeToggleBtn',
             'logoutBtn',
-            'loadingIndicator'
         ];
 
         let missingElements = [];
@@ -99,6 +150,101 @@ const UI = {
         });
     },
 
+    createStreamingMessage() {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message ai-message streaming';
+        messageElement.innerHTML = `
+            <div class="message-content">
+                <div class="section-content">
+                    <p></p>
+                </div>
+            </div>
+        `;
+        
+        this.elements.chatArea.appendChild(messageElement);
+        return messageElement;
+    },
+
+    updateStreamingMessage(messageElement, content) {
+        const contentElement = messageElement.querySelector('.section-content');
+        if (!contentElement) {
+            console.error('Content element not found in message');
+            return;
+        }
+
+        try {
+            contentElement.innerHTML = this.formatMessageForStreaming(content);
+        } catch (error) {
+            console.error('Error updating message content:', error);
+            contentElement.textContent = content;
+        }
+    },
+
+    finalizeStreamingMessage(messageElement, suggestions = null) {
+        messageElement.classList.remove('streaming');
+        
+        if (suggestions && suggestions.length > 0) {
+            const contentDiv = messageElement.querySelector('.message-content');
+            if (contentDiv) {
+                contentDiv.innerHTML += this.createSuggestionChips(suggestions);
+            }
+        }
+    },
+
+    formatMessageForStreaming(message) {
+        // Clean up special characters
+        let cleanedMessage = message
+            .replace(/###/g, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+    
+        // Check if the message is a numbered list
+        const isNumberedList = /^\d+\.\s+[A-Z]/.test(cleanedMessage);
+    
+        if (isNumberedList) {
+            // Handle numbered lists
+            const sections = cleanedMessage.split(/(?=\d+\.\s+[A-Z])/);
+            
+            return sections.map((section, index) => {
+                if (index === 0 && !section.trim()) return '';
+                
+                const match = section.match(/(\d+\.\s+[^:]+):(.*)/s);
+                if (match) {
+                    const [_, title, content] = match;
+                    return `
+                        <div class="message-section">
+                            <div class="section-title">${title.trim()}</div>
+                            <div class="section-content">
+                                <p>${content.trim()}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+                return `<p>${section.trim()}</p>`;
+            }).join('');
+        } else {
+            // Handle sectioned paragraphs
+            const sections = cleanedMessage.split(/\*\*(.*?)\*\*/g);
+            let formattedContent = '';
+            
+            for (let i = 0; i < sections.length; i++) {
+                if (i % 2 === 0) {
+                    // Regular text
+                    formattedContent += `<p>${sections[i]}</p>`;
+                } else {
+                    // Section titles
+                    formattedContent += `<div class="section-title">${sections[i]}</div>`;
+                }
+            }
+    
+            return `
+                <div class="message-section">
+                    ${formattedContent}
+                </div>
+            `;
+        }
+    },
+
     appendMessage(sender, message, suggestions = null) {
         const messageElement = document.createElement('div');
         messageElement.className = `message ${sender}-message`;
@@ -107,33 +253,13 @@ const UI = {
             let formattedMessage = message
                 .replace(/^\s*\*\s+/gm, '')
                 .replace(/###\s*/g, '')
-                .replace(/##\s*/g, '')
-                .replace(/#\s*/g, '')
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/\n\s*\n/g, '\n')
                 .trim();
-
-            const sections = formattedMessage.split(/(?=Creative and Artsy|Games and Challenges|Let's Play|Getting Started)/g);
-
-            formattedMessage = sections.map(section => {
-                const [title, ...content] = section.trim().split('\n');
-                if (content.length) {
-                    return `
-                        <div class="message-section">
-                            <div class="section-title">${title.trim()}</div>
-                            <div class="section-content">
-                                ${content.map(line => `<p>${line.trim()}</p>`).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-                return `<p>${title.trim()}</p>`;
-            }).join('');
 
             messageElement.innerHTML = `
                 <div class="message-content">
-                    ${formattedMessage}
+                    <p>${formattedMessage}</p>
                     ${suggestions ? this.createSuggestionChips(suggestions) : ''}
                 </div>
             `;
@@ -146,7 +272,6 @@ const UI = {
         }
 
         this.elements.chatArea.appendChild(messageElement);
-        this.scrollToBottom();
     },
 
     createSuggestionChips(suggestions) {
@@ -155,18 +280,6 @@ const UI = {
                 ${suggestions.map(s => `<button class="suggestion-chip">${s}</button>`).join('')}
             </div>
         `;
-    },
-
-    scrollToBottom() {
-        this.elements.chatArea.scrollTop = this.elements.chatArea.scrollHeight;
-    },
-
-    showLoading() {
-        this.elements.loadingIndicator.style.display = 'block';
-    },
-
-    hideLoading() {
-        this.elements.loadingIndicator.style.display = 'none';
     },
 
     updateTheme() {
@@ -198,7 +311,6 @@ const EventHandlers = {
 
         try {
             ChatState.isProcessing = true;
-            UI.showLoading();
 
             UI.appendMessage('user', messageText);
             UI.elements.messageInput.value = '';
@@ -209,22 +321,34 @@ const EventHandlers = {
                 ChatState.conversationId = startResponse.conversationId;
             }
 
-            const response = await API.post('/chat/message', {
+            const streamingMessage = UI.createStreamingMessage();
+            let fullResponse = '';
+
+            await API.stream('/chat/message', {
                 message: messageText,
                 childId: ChatState.childData.id,
                 conversationId: ChatState.conversationId
+            }, async (data) => {
+                if (data.error) {
+                    throw new Error(data.message || 'Failed to process message');
+                }
+
+                if (data.done) {
+                    UI.finalizeStreamingMessage(streamingMessage, data.suggestions);
+                    
+                    if (data.messageLimit && data.isNearLimit) {
+                        UI.showSuccess(`${data.messagesRemaining} messages remaining today`);
+                    }
+                } else if (data.content) {
+                    fullResponse += data.content;
+                    UI.updateStreamingMessage(streamingMessage, fullResponse);
+                }
             });
 
-            if (!response.success) {
-                throw new Error(response.message || 'Failed to send message');
-            }
-
-            UI.appendMessage('ai', response.message, response.suggestions);
         } catch (error) {
             UI.showError(error.message || 'Failed to send message');
         } finally {
             ChatState.isProcessing = false;
-            UI.hideLoading();
         }
     },
 
@@ -233,8 +357,6 @@ const EventHandlers = {
             if (UI.elements.chatArea.children.length > 0) {
                 if (!confirm('Start a new conversation? This will clear the current chat.')) return;
             }
-
-            UI.showLoading();
 
             if (ChatState.conversationId) {
                 await API.post(`/chat/conversation/${ChatState.conversationId}/end`);
@@ -255,8 +377,6 @@ const EventHandlers = {
             }
         } catch (error) {
             UI.showError('Unable to start new conversation');
-        } finally {
-            UI.hideLoading();
         }
     },
 
@@ -294,7 +414,6 @@ async function initializeChat() {
             throw new Error('Failed to initialize UI');
         }
 
-        UI.showLoading();
         ChatState.childData = userData;
         UI.elements.childName.textContent = userData.name || 'Friend';
 
@@ -313,8 +432,6 @@ async function initializeChat() {
         ChatState.isInitialized = true;
     } catch (error) {
         UI.showError('Failed to initialize chat');
-    } finally {
-        UI.hideLoading();
     }
 }
 
