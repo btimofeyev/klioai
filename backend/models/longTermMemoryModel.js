@@ -9,7 +9,13 @@ class LongTermMemoryModel {
     static async processNewSummary(childId, summary) {
         const client = await pool.connect();
         try {
+            console.log('[ProcessNewSummary] Starting for childId:', childId);
             const insights = await this.extractInsights(summary);
+            
+            if (!insights || typeof insights !== 'object') {
+                console.error('[ProcessNewSummary] Invalid insights structure:', insights);
+                return;
+            }
 
             await client.query('BEGIN');
 
@@ -18,30 +24,42 @@ class LongTermMemoryModel {
                 [childId]
             );
 
+            console.log('[ProcessNewSummary] Existing topics found:', existingTopicsRes.rows.length);
             const topicMap = this.createTopicMap(existingTopicsRes.rows);
 
-            for (const topic of insights.topics) {
-                if (this.isGenericTopic(topic)) continue;
+            const topics = Array.isArray(insights.topics) ? insights.topics : 
+                          (insights.topics ? Object.keys(insights.topics) : []);
+
+            console.log('[ProcessNewSummary] Processing topics:', topics);
+
+            for (const topic of topics) {
+                if (!topic || this.isGenericTopic(topic)) {
+                    console.log('[ProcessNewSummary] Skipping generic topic:', topic);
+                    continue;
+                }
 
                 const matchingTopic = this.findMatchingTopic(topic, topicMap);
+                console.log('[ProcessNewSummary] Matching topic found:', matchingTopic);
 
-                if (matchingTopic) {
+                if (matchingTopic && topicMap[matchingTopic.toLowerCase()]) {
                     await this.updateExistingTopic(
+                        client,
                         childId,
                         matchingTopic,
                         topic,
                         insights,
-                        topicMap[matchingTopic]
+                        topicMap[matchingTopic.toLowerCase()]
                     );
                 } else {
+                    console.log('[ProcessNewSummary] Creating new topic:', topic);
                     const initialDetails = {
-                        sub_topics: insights.sub_topics[topic] || [],
+                        sub_topics: (insights.sub_topics?.[topic] || []),
                         knowledge_bits: [{
-                            fact: insights.knowledge_bits[topic],
+                            fact: insights.knowledge_bits?.[topic] || 'Discussed this topic',
                             learned_at: new Date().toISOString()
                         }],
                         engagement_level: "initial",
-                        related_interests: insights.related_interests[topic] || []
+                        related_interests: (insights.related_interests?.[topic] || [])
                     };
 
                     await client.query(
@@ -54,21 +72,27 @@ class LongTermMemoryModel {
             }
 
             await client.query('COMMIT');
+            console.log('[ProcessNewSummary] Successfully completed for childId:', childId);
         } catch (error) {
-            await pool.query('ROLLBACK');
-            console.error('Error processing new summary:', error);
+            await client.query('ROLLBACK');
+            console.error('[ProcessNewSummary] Error:', error);
             throw error;
         } finally {
-            pool.release();
+            client.release();
         }
     }
-
     static async extractInsights(summary) {
         const systemMessage = {
             role: "system",
             content: `You are analyzing conversations to build a child's long-term memory profile.
-                      Extract core interests, knowledge, subtopics, and related interests as JSON.
-                      Ignore generic, conversational patterns and focus on subject matter interests.`
+                     Extract and return a JSON object with the following structure:
+                     {
+                         "topics": [],             // Array of main topics discussed
+                         "sub_topics": {},         // Object mapping topics to their subtopics
+                         "knowledge_bits": {},     // Object mapping topics to key learnings
+                         "related_interests": {}   // Object mapping topics to related interests
+                     }
+                     Focus on subject matter interests and ignore generic conversation patterns.`
         };
 
         try {
@@ -83,31 +107,55 @@ class LongTermMemoryModel {
                 response_format: { type: "json_object" }
             });
 
-            return JSON.parse(completion.choices[0].message.content);
+            const insights = JSON.parse(completion.choices[0].message.content);
+            
+ 
+            return {
+                topics: insights.topics || [],
+                sub_topics: insights.sub_topics || {},
+                knowledge_bits: insights.knowledge_bits || {},
+                related_interests: insights.related_interests || {}
+            };
         } catch (error) {
             console.error('Error extracting insights:', error);
-            throw error;
+            // Return a valid but empty structure instead of throwing
+            return {
+                topics: [],
+                sub_topics: {},
+                knowledge_bits: {},
+                related_interests: {}
+            };
         }
     }
-
     static createTopicMap(existingTopics) {
         const topicMap = {};
         for (const row of existingTopics) {
-            const details = typeof row.details === 'string' ? JSON.parse(row.details) : row.details;
-            const mainTopic = row.topic.toLowerCase();
-            const relatedTerms = [
-                ...details.sub_topics.map(st => st.toLowerCase()),
-                ...details.related_interests.map(ri => ri.toLowerCase())
-            ];
+            if (!row || !row.topic) continue;
+            
+            try {
+                const details = typeof row.details === 'string' ? 
+                    JSON.parse(row.details) : 
+                    (row.details || { sub_topics: [], related_interests: [] });
 
-            topicMap[mainTopic] = {
-                originalTopic: row.topic,
-                relatedTerms,
-                details
-            };
+                const mainTopic = row.topic.toLowerCase();
+                const relatedTerms = [
+                    ...(details.sub_topics || []).map(st => st.toLowerCase()),
+                    ...(details.related_interests || []).map(ri => ri.toLowerCase())
+                ];
+
+                topicMap[mainTopic] = {
+                    originalTopic: row.topic,
+                    relatedTerms,
+                    details
+                };
+            } catch (error) {
+                console.error('[CreateTopicMap] Error processing row:', error);
+                continue;
+            }
         }
         return topicMap;
     }
+
 
     static findMatchingTopic(newTopic, topicMap) {
         const normalized = newTopic.toLowerCase();
@@ -211,34 +259,58 @@ class LongTermMemoryModel {
         }
     }
 
-    static async updateExistingTopic(childId, existingTopic, newTopic, insights, existingData) {
+    static async updateExistingTopic(client, childId, existingTopic, newTopic, insights, existingData) {
         try {
+            console.log('[UpdateExistingTopic] Starting update for:', {
+                childId,
+                existingTopic,
+                newTopic,
+                hasExistingData: !!existingData
+            });
+
+            if (!existingData || !existingData.details) {
+                console.log('[UpdateExistingTopic] No existing data, creating new details object');
+                existingData = {
+                    details: {
+                        sub_topics: [],
+                        knowledge_bits: [],
+                        engagement_level: "initial",
+                        related_interests: []
+                    }
+                };
+            }
+
             const details = existingData.details;
             const newKnowledgeBit = {
-                fact: insights.knowledge_bits[newTopic],
+                fact: insights.knowledge_bits?.[newTopic] || 'Continued discussion on this topic',
                 learned_at: new Date().toISOString()
             };
+
+            details.knowledge_bits = Array.isArray(details.knowledge_bits) ? 
+                details.knowledge_bits : [];
 
             if (!details.knowledge_bits.some(kb => kb.fact === newKnowledgeBit.fact)) {
                 details.knowledge_bits.push(newKnowledgeBit);
             }
 
-            const newSubTopics = insights.sub_topics[newTopic] || [];
-            details.sub_topics = [...new Set([...details.sub_topics, ...newSubTopics])];
+            const newSubTopics = insights.sub_topics?.[newTopic] || [];
+            details.sub_topics = [...new Set([...(details.sub_topics || []), ...newSubTopics])];
 
-            const newRelatedInterests = insights.related_interests[newTopic] || [];
-            details.related_interests = [...new Set([...details.related_interests, ...newRelatedInterests])];
+            const newRelatedInterests = insights.related_interests?.[newTopic] || [];
+            details.related_interests = [...new Set([...(details.related_interests || []), ...newRelatedInterests])];
 
-            await pool.query(
+            await client.query(
                 `UPDATE long_term_memory_graph 
                  SET details = $1::jsonb,
                      last_seen = NOW(),
-                     engagement_count = engagement_count + 1
+                     engagement_count = COALESCE(engagement_count, 0) + 1
                  WHERE child_id = $2 AND topic = $3`,
                 [details, childId, existingTopic]
             );
+
+            console.log('[UpdateExistingTopic] Successfully updated topic:', existingTopic);
         } catch (error) {
-            console.error('Error updating existing topic:', error);
+            console.error('[UpdateExistingTopic] Error:', error);
             throw error;
         }
     }

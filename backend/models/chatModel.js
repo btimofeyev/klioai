@@ -339,49 +339,102 @@ class ChatModel {
         return completion.choices[0].message.content;
     }
 
+    static async getFilterSettings(childId) {
+        const pool = require("../config/db");
+        try {
+            console.log(`[ParentalControls] Fetching settings for child ID: ${childId}`);
+            
+            const result = await pool.query(
+                `SELECT pc.filter_inappropriate, pc.block_personal_info
+                 FROM parental_controls pc
+                 WHERE pc.child_id = $1`,
+                [childId]
+            );
+
+            console.log('[ParentalControls] Query result:', {
+                rowCount: result.rows.length,
+                settings: result.rows[0] || 'No settings found'
+            });
+
+            const settings = result.rows.length === 0 ? {
+                filterInappropriate: true, // Default to true for safety
+                blockPersonalInfo: true,
+                source: 'default'
+            } : {
+                filterInappropriate: result.rows[0].filter_inappropriate,
+                blockPersonalInfo: result.rows[0].block_personal_info,
+                source: 'database'
+            };
+
+            console.log('[ParentalControls] Final settings:', settings);
+            
+            return settings;
+        } catch (error) {
+            console.error("Error getting filter settings:", error);
+            return {
+                filterInappropriate: true,
+                blockPersonalInfo: true
+            };
+        }
+    }
+
     static async generateAIResponse(messages, childData) {
         try {
             const LongTermMemoryModel = require("./longTermMemoryModel");
             const memoryGraph = await LongTermMemoryModel.getChildMemoryGraph(childData.id);
-    
+            const filterSettings = await this.getFilterSettings(childData.id);
             const recentMessages = messages.slice(-20);
-            const filterSettings = await ContentFilter.getFilterSettings(childData.id);
-    
+
             const systemMessage = {
                 role: "system",
-                content: `You are Klio, a helpful, child-friendly AI assistant. 
-                          Age: ${childData.age}. 
-                          Interests: ${memoryGraph.mainInterests.join(", ")}.
-                          Recent learning: ${memoryGraph.recentLearning.map(l => l.fact).join("; ")}.
-    
-                          ${
-                              filterSettings.filterInappropriate
-                              ? `If topics are inappropriate, redirect the conversation to a safe topic.`
-                              : ''
-                          }
-                          
-                          ${
-                              filterSettings.blockPersonalInfo
-                              ? `Never request personal info. If shared, discourage it and redirect.`
-                              : ''
-                          }
-                          Keep responses friendly, educational, and age-appropriate, and as concise as possible.`
+                content: `You are Klio, a helpful, child-friendly AI assistant.
+                         Age: ${childData.age}
+                         Interests: ${memoryGraph.mainInterests.join(", ")}
+                         Recent learning: ${memoryGraph.recentLearning.map(l => l.fact).join("; ")}
+
+                         ${filterSettings.filterInappropriate ? `
+                         Content Filtering Instructions:
+                         - IMMEDIATELY REDIRECT any discussions about:
+                           * Violence, weapons, or fighting
+                           * Death, injury, or harm
+                           * Adult themes or inappropriate content
+                           * Hate speech or bullying
+                           * Dangerous or risky behavior
+
+                         When these topics arise:
+                         1. Acknowledge curiosity briefly
+                         2. Redirect to a safe, related topic
+                         3. Use format: "I understand you're curious, but let's talk about [safe alternative] instead! Did you know [interesting fact about safe topic]?"` : ''}
+
+                         ${filterSettings.blockPersonalInfo ? `
+                         Personal Information Protection:
+                         - Never request personal information
+                         - If personal information is shared (addresses, phone numbers, email, social media, school names):
+                           1. Gently discourage sharing such information
+                           2. Redirect the conversation
+                           3. Do not repeat or reference the shared personal information` : ''}
+
+                         Additional Guidelines:
+                         - Keep responses friendly, educational, and age-appropriate
+                         - Be concise but engaging
+                         - Focus on positive learning experiences
+                         - Encourage safe, educational discussions`
             };
-    
+
             const formattedMessages = recentMessages.map(msg => ({
                 role: msg.role,
                 content: msg.content,
             }));
-    
+
             const stream = await openai.chat.completions.create({
                 model: "gpt-4o",
                 messages: [systemMessage, ...formattedMessages],
                 max_tokens: 1550,
                 temperature: 0.7,
-                stream: true  // Enable streaming
+                stream: true
             });
-    
-            return stream; // Return the stream instead of the response
+
+            return stream;
         } catch (error) {
             console.error("Error generating AI response:", error);
             throw new Error("Failed to generate AI response");
