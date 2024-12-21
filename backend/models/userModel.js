@@ -97,8 +97,8 @@ class User {
   static async handleSubscriptionUpdate(subscription) {
     const priceId = subscription.items.data[0].price.id;
     const planMap = {
-      'price_1QP9N4DII9A9349ohlOJgJEE': 'single',
-      'price_1QP9NLDII9A9349oDRxFpdWx': 'familypro'
+      'price_1QVLU5DII9A9349o7xJSR3OZ': 'single',     // Updated to match routes
+      'price_1QVLUbDII9A9349oEK9fzVp1': 'familypro'   // Updated to match routes
     };
     
     const planType = planMap[priceId];
