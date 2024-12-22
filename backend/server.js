@@ -30,6 +30,10 @@ const app = express();
 app.post('/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   console.log('⭐ Webhook received:', new Date().toISOString());
   console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Raw body type:', typeof req.body);
+  console.log('Is Buffer?', Buffer.isBuffer(req.body));
+  console.log('Body length:', req.body?.length);
+  
   
   const sig = req.headers['stripe-signature'];
   let event;
@@ -245,7 +249,7 @@ app.use(cors({
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'stripe-signature'] 
 }));
 
 app.use(express.json());
