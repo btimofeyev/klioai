@@ -56,22 +56,38 @@ class ChatController {
         try {
             await client.query('BEGIN');
     
-            const childId = req.user.childId;
+            // Log authentication state for debugging
+            console.log('Auth state:', {
+                hasUser: !!req.user,
+                role: req.user?.role,
+                childId: req.user?.childId,
+                userId: req.user?.id
+            });
+            
+            const childId = req.user?.childId;
+            
+            // Explicit validation for childId
+            if (!childId) {
+                throw new Error('Child ID is missing. Make sure you are authenticated as a child user.');
+            }
+            
             const { message, conversationId } = req.body;
     
             if (!message?.trim() || !conversationId) {
                 throw new Error('Message and conversation ID are required');
             }
     
-            const [childData, controls] = await Promise.all([
-                Child.findById(childId),
-                ParentalControl.findByChildId(childId)
-            ]);
-    
+            // First check if child exists before fetching parental controls
+            const childData = await Child.findById(childId);
+            
             if (!childData) {
-                throw new Error('Child not found');
+                throw new Error(`Child not found with ID: ${childId}`);
             }
+            
+            // Now fetch parental controls with validated childId
+            const controls = await ParentalControl.findByChildId(childId);
     
+            // Rest of your function remains the same
             if (childData.messages_used >= controls.message_limit) {
                 await ChatModel.endConversation(conversationId);
                 return res.status(403).json({
