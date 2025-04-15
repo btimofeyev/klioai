@@ -130,13 +130,15 @@ class ChatController {
             const suggestions = await ChatModel.generateSuggestions(fullResponse, childData);
     
             // Increment message usage
-            await client.query('UPDATE children SET messages_used = messages_used + 1 WHERE id = $1', [childId]);
-            const { rows: [{ messages_used }] } = await client.query(
-                'SELECT messages_used FROM children WHERE id = $1',
-                [childId]
-            );
-    
-            await client.query('COMMIT');
+            const { rows } = await client.query(
+                'SELECT messages_used FROM children WHERE id = $1', [childId]
+              );
+              if (!rows.length) {
+                await client.query('ROLLBACK');
+                throw new Error(`Child with id ${childId} not found during message update.`);
+              }
+              const { messages_used } = rows[0];
+              await client.query('COMMIT');
     
             // Send final message with metadata
             res.write(`data: ${JSON.stringify({
