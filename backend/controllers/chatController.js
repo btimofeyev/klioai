@@ -9,11 +9,9 @@ class ChatController {
         try {
             const childId = req.user.childId;
             const activeConv = await ChatModel.getActiveConversation(childId);
-
             if (activeConv) {
                 await ChatModel.endConversation(activeConv.id);
             }
-
             const conversationId = await ChatModel.startNewConversation(childId);
             res.json({ success: true, conversationId });
         } catch (error) {
@@ -55,7 +53,7 @@ class ChatController {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
-    
+
             // Log authentication state for debugging
             console.log('Auth state:', {
                 hasUser: !!req.user,
@@ -63,33 +61,26 @@ class ChatController {
                 childId: req.user?.childId,
                 userId: req.user?.id
             });
-            
+
             const childId = req.user?.childId;
-            
-            // Explicit validation for childId
             if (!childId) {
                 throw new Error('Child ID is missing. Make sure you are authenticated as a child user.');
             }
-            
             const { message, conversationId } = req.body;
-    
             if (!message?.trim() || !conversationId) {
                 throw new Error('Message and conversation ID are required');
             }
-    
-            // First check if child exists before fetching parental controls
-            const childData = await Child.findById(childId);
-            
+
+            // All .findBy... and similar must accept/use the transaction client!
+            const childData = await Child.findById(childId, client);
             if (!childData) {
                 throw new Error(`Child not found with ID: ${childId}`);
             }
-            
-            // Now fetch parental controls with validated childId
-            const controls = await ParentalControl.findByChildId(childId);
-    
-            // Rest of your function remains the same
+            const controls = await ParentalControl.findByChildId(childId, client);
+
             if (childData.messages_used >= controls.message_limit) {
-                await ChatModel.endConversation(conversationId);
+                await ChatModel.endConversation(conversationId, client);
+                await client.query('COMMIT');
                 return res.status(403).json({
                     success: false,
                     message: 'Message limit reached for today',
@@ -97,50 +88,67 @@ class ChatController {
                     messagesUsed: childData.messages_used
                 });
             }
-    
-            // Save user message
-            await ChatModel.saveMessage(childId, conversationId, message, 'user');
-    
-            // Generate AI response
-            const chatHistory = await ChatModel.getConversationMessages(conversationId);
-            const stream = await ChatModel.generateAIResponse(chatHistory, childData);
-            
-            // Set up streaming response headers
+
+            await ChatModel.saveMessage(childId, conversationId, message, 'user', client);
+
+            const chatHistory = await ChatModel.getConversationMessages(conversationId, client);
+            let stream;
+            try {
+                stream = await ChatModel.generateAIResponse(chatHistory, childData, client);
+            } catch (streamError) {
+                console.error("OpenAI stream init failed:", streamError);
+                await client.query("ROLLBACK");
+                res.write(`data: ${JSON.stringify({ error: true, message: streamError.message || "Failed to contact AI" })}\n\n`);
+                res.end();
+                return;
+            }
+
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
-    
+
             let fullResponse = '';
-    
-            // Stream the response
-            for await (const chunk of stream) {
-                const content = chunk.choices[0]?.delta?.content || '';
-                fullResponse += content;
-                
-                if (content) {
-                    // Send the chunk to the client
-                    res.write(`data: ${JSON.stringify({ content })}\n\n`);
+            try {
+                for await (const chunk of stream) {
+                    console.log("AI Stream Chunk:", chunk);
+                    if (chunk.type === "response.output_text.delta" && chunk.delta) {
+                        res.write(`data: ${JSON.stringify({ content: chunk.delta })}\n\n`);
+                        fullResponse += chunk.delta;
+                    }
+                    // Optionally: handle others
+                    // else if (chunk.type === "response.output_text.done") { ... }
                 }
+            } catch (streamingError) {
+                await client.query('ROLLBACK');
+                console.error('Error during OpenAI streaming:', streamingError);
+                res.write(`data: ${JSON.stringify({
+                    error: true,
+                    message: streamingError.message || "Streaming error"
+                })}\n\n`);
+                res.end();
+                client.release();
+                return;
             }
-    
-            // Save the complete AI response
-            await ChatModel.saveMessage(childId, conversationId, fullResponse, 'assistant');
-    
-            // Generate suggestions
+
+            await ChatModel.saveMessage(childId, conversationId, fullResponse, 'assistant', client);
             const suggestions = await ChatModel.generateSuggestions(fullResponse, childData);
-    
-            // Increment message usage
+
+            await client.query(
+                'UPDATE children SET messages_used = messages_used + 1 WHERE id = $1',
+                [childId]
+            );
+
             const { rows } = await client.query(
                 'SELECT messages_used FROM children WHERE id = $1', [childId]
-              );
-              if (!rows.length) {
+            );
+            console.log("children SELECT rows after increment:", rows); // <--- Debug!
+            if (!rows.length) {
                 await client.query('ROLLBACK');
                 throw new Error(`Child with id ${childId} not found during message update.`);
-              }
-              const { messages_used } = rows[0];
-              await client.query('COMMIT');
-    
-            // Send final message with metadata
+            }
+            const { messages_used } = rows[0];
+            await client.query('COMMIT');
+
             res.write(`data: ${JSON.stringify({
                 done: true,
                 suggestions,
@@ -150,10 +158,9 @@ class ChatController {
                 conversationId,
                 isNearLimit: (controls.message_limit - messages_used) <= 5
             })}\n\n`);
-    
             res.end();
         } catch (error) {
-            await client.query('ROLLBACK');
+            try { await client.query('ROLLBACK'); } catch (e) { }
             console.error('Error processing message:', error);
             res.write(`data: ${JSON.stringify({
                 error: true,
@@ -170,7 +177,6 @@ class ChatController {
         try {
             const { childId } = req.params;
             await pool.query('UPDATE children SET messages_used = 0 WHERE id = $1', [childId]);
-
             res.json({ success: true, message: "Daily message count reset successfully" });
         } catch (error) {
             console.error("Error resetting messages:", error);
@@ -178,7 +184,6 @@ class ChatController {
         }
     }
 
-    // Logout Handling
     static async handleLogout(req, res) {
         try {
             const { conversationId } = req.body;

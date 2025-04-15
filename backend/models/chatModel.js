@@ -334,36 +334,38 @@ class ChatModel {
   }
 
   static async generateSummary(messages, childData) {
-    const systemMsg = {
-      role: "system",
-      content: `Create a structured summary of ${childData.name}'s (age ${childData.age}) conversation for their parents. Use these exact sections:
-      🚨 Topics of Concern
-      💭 Topics Discussed
-      📊 Engagement Level
-      📚 Key Learning Points
-      👪 Parent Tips`,
-    };
-    const userMsg = {
-      role: "user",
-      content: `Analyze this conversation: ${JSON.stringify(messages)}`,
-    };
+    const instructions = `Create a structured summary of ${childData.name}'s (age ${childData.age}) conversation for their parents.
+    Use these exact sections:
+    
+    🚨 Topics of Concern
+    💭 Topics Discussed
+    📊 Engagement Level
+    📚 Key Learning Points
+    👪 Parent Tips`;
+
+    // Don't send thousands of messages; only what you need.
+    const sampleMessages = messages.slice(-30);
+
+    const input = [
+      { role: "developer", content: instructions },
+      {
+        role: "user",
+        content:
+          "Analyze this conversation: " +
+          sampleMessages
+            .map(
+              (m) => `[${m.role}] ${m.content}` // simple readable form
+            )
+            .join("\n"),
+      },
+    ];
 
     const response = await openai.responses.create({
-      model: "gpt-4.1-mini", // or your model
-      input: [systemMsg, userMsg],
-      text: { format: { type: "text" } },
-      reasoning: {},
-      tools: [],
-      temperature: 0.7,
-      max_output_tokens: 800,
-      top_p: 1,
-      store: false,
+      model: "gpt-4.1",
+      input,
     });
 
-    // If the API spec changes, check response format (content, or choices[0].content)
-    return (
-      response.content || (response.choices && response.choices[0].content)
-    );
+    return response.output_text;
   }
 
   static async getFilterSettings(childId) {
@@ -413,71 +415,68 @@ class ChatModel {
   static async generateAIResponse(messages, childData) {
     try {
       const LongTermMemoryModel = require("./longTermMemoryModel");
-      const memoryGraph = await LongTermMemoryModel.getChildMemoryGraph(
-        childData.id
-      );
+      const memoryGraph = await LongTermMemoryModel.getChildMemoryGraph(childData.id);
       const filterSettings = await this.getFilterSettings(childData.id);
       const recentMessages = messages.slice(-20);
-
-      const systemMessage = {
-        role: "system",
-        content: `You are Klio, a helpful, child-friendly AI assistant.
-                         Age: ${childData.age}
-                         Interests: ${memoryGraph.mainInterests.join(", ")}
-                         Recent learning: ${memoryGraph.recentLearning
-                           .map((l) => l.fact)
-                           .join("; ")}
-
-                         ${
-                           filterSettings.filterInappropriate
-                             ? `
-                         Content Filtering Instructions:
-                         - IMMEDIATELY REDIRECT any discussions about:
-                           * Violence, weapons, or fighting
-                           * Death, injury, or harm
-                           * Adult themes or inappropriate content
-                           * Hate speech or bullying
-                           * Dangerous or risky behavior
-
-                         When these topics arise:
-                         1. Acknowledge curiosity briefly
-                         2. Redirect to a safe, related topic
-                         3. Use format: "I understand you're curious, but let's talk about [safe alternative] instead! Did you know [interesting fact about safe topic]?"`
-                             : ""
-                         }
-
-                         ${
-                           filterSettings.blockPersonalInfo
-                             ? `
-                         Personal Information Protection:
-                         - Never request personal information
-                         - If personal information is shared (addresses, phone numbers, email, social media, school names):
-                           1. Gently discourage sharing such information
-                           2. Redirect the conversation
-                           3. Do not repeat or reference the shared personal information`
-                             : ""
-                         }
-
-                         Additional Guidelines:
-                         - Keep responses friendly, educational, and age-appropriate
-                         - Be concise but engaging
-                         - Focus on positive learning experiences
-                         - Encourage safe, educational discussions`,
-      };
-
-      const formattedMessages = recentMessages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
+  
+      let developerContent = [
+        `You are Klio, a helpful, child-friendly AI assistant.`,
+        `Age: ${childData.age}`,
+        `Interests: ${(memoryGraph.mainInterests || []).join(", ")}`,
+        `Recent learning: ${(memoryGraph.recentLearning || []).map((l) => l.fact).join("; ")}`,
+        ``,
+        ...(filterSettings.filterInappropriate
+          ? [
+              "Content Filtering Instructions:",
+              "- IMMEDIATELY REDIRECT any discussions about:",
+              "  * Violence, weapons, fighting",
+              "  * Death, injury or harm",
+              "  * Adult themes/inappropriate content",
+              "  * Hate speech/bullying",
+              "  * Dangerous/risky behavior",
+              "",
+              "When these topics arise:",
+              "1. Acknowledge curiosity briefly",
+              "2. Redirect to a safe, related topic",
+              `3. Use: "I understand you're curious, but let's talk about [safe alternative] instead! Did you know [interesting fact about safe topic]?"`,
+              "",
+            ]
+          : []),
+        ...(filterSettings.blockPersonalInfo
+          ? [
+              "Personal Information Protection:",
+              "- Never request personal information",
+              "- If personal information is shared (addresses, emails, phone numbers, school names):",
+              "  1. Gently discourage sharing",
+              "  2. Redirect the conversation",
+              "  3. NEVER repeat or reference the info",
+              "",
+            ]
+          : []),
+        "Additional:",
+        "- Friendly, educational, and age-appropriate",
+        "- Concise but engaging",
+        "- Focus on positive learning",
+        "- Encourage safe, educational discussions",
+      ].join("\n");
+  
+      // Convert message roles for API
+      const input = [
+        { role: "developer", content: developerContent },
+        ...recentMessages.map((msg) => ({
+          role: msg.role === "system" ? "developer" : msg.role,
+          content: msg.content,
+        })),
+      ];
+  
+      // STREAM!
       const stream = await openai.responses.create({
-        model: "gpt-4.1-mini",
-        input: [systemMessage, ...formattedMessages],
-        temperature: 0.7,
+        model: "gpt-4.1",
+        input,
         stream: true,
       });
-
-      return stream;
+  
+      return stream; // Return stream, don't try to read it here
     } catch (error) {
       console.error("Error generating AI response:", error);
       throw new Error("Failed to generate AI response");
@@ -486,50 +485,36 @@ class ChatModel {
 
   static async generateSuggestions(aiResponse, childData) {
     try {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        input: [
-          {
-            role: "system",
-            content: `Generate 3 potential questions or prompts that a ${childData.age}-year-old child might want to ask you based on the conversation.
-                        Rules:
-                        - These should be questions/prompts the child could ask YOU (the AI)
-                        - Keep them relevant to the previous response
-                        - Use child-friendly language
-                        - Make them interesting and engaging
-                        - No questions about personal information
-                        - Focus on exploration and learning
-                        - Keep them short and clear
-                        
-                        Return exactly 3 suggestions as JSON:
-                        {
-                          "suggestions": [
-                            "suggestion 1",
-                            "suggestion 2",
-                            "suggestion 3"
-                          ]
-                        }`,
-          },
-          {
-            role: "user",
-            content: `Based on your previous response: "${aiResponse}"\nGenerate engaging suggestions for what the child might want to ask or explore next.`,
-          },
-        ],
-        temperature: 0.7,
+      const instructions = `
+Generate exactly 3 potential questions or prompts that a ${childData.age}-year-old child might want to ask you based on the last response.
+- These should be questions/prompts the child could ask the AI (Klio).
+- Use child-friendly language and make them interesting and engaging.
+- No questions about personal information.
+- Keep them relevant to the previous response.
+- Return ONLY a JSON array: { "suggestions": [ "first", "second", "third" ] }
+`;
+
+      const input = [
+        { role: "developer", content: instructions },
+        {
+          role: "user",
+          content: `Previous response: "${aiResponse}". Generate engaging questions/prompts for the next turn.`,
+        },
+      ];
+
+      const response = await openai.responses.create({
+        model: "gpt-4.1",
+        input,
       });
 
-      const rawContent = completion.choices[0].message.content
-        .replace(/```json|```/g, "")
-        .trim();
-      const suggestions = JSON.parse(rawContent).suggestions;
+      // The API (should!) return a JSON string as specified
+      const raw = response.output_text.replace(/```json|```/g, "").trim();
+      const suggestions = JSON.parse(raw).suggestions;
 
       if (Array.isArray(suggestions)) {
-        return suggestions.map((suggestion) => {
-          let formatted = suggestion.trim();
-          formatted = formatted.charAt(0).toUpperCase() + formatted.slice(1);
-          // Don't automatically add question marks as some might be prompts
-          return formatted;
-        });
+        return suggestions.map(
+          (s) => s.trim().charAt(0).toUpperCase() + s.trim().slice(1)
+        );
       } else {
         return getDefaultSuggestions(childData.age);
       }
