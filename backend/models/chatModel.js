@@ -472,7 +472,7 @@ class ChatModel {
 
       const stream = await openai.responses.create({
         model: "gpt-4.1-mini",
-        messages: [systemMessage, ...formattedMessages],
+        input: [systemMessage, ...formattedMessages],
         max_tokens: 1550,
         temperature: 0.7,
         stream: true,
@@ -489,7 +489,7 @@ class ChatModel {
     try {
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
-        messages: [
+        input: [
           {
             role: "system",
             content: `Generate 3 potential questions or prompts that a ${childData.age}-year-old child might want to ask you based on the conversation.
