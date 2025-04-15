@@ -473,7 +473,6 @@ class ChatModel {
       const stream = await openai.responses.create({
         model: "gpt-4.1-mini",
         input: [systemMessage, ...formattedMessages],
-        max_tokens: 1550,
         temperature: 0.7,
         stream: true,
       });
@@ -516,7 +515,6 @@ class ChatModel {
             content: `Based on your previous response: "${aiResponse}"\nGenerate engaging suggestions for what the child might want to ask or explore next.`,
           },
         ],
-        max_tokens: 150,
         temperature: 0.7,
       });
 
