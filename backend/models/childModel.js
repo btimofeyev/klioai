@@ -179,7 +179,7 @@ class Child {
         }
     }
 
-    static async findById(childId, parentId = null) {
+    static async findById(childId, parentId = null, dbClient = pool) { // Added dbClient parameter
         let query = `
             SELECT 
                 c.*,
@@ -190,19 +190,31 @@ class Child {
             LEFT JOIN parental_controls pc ON c.id = pc.child_id
             WHERE c.id = $1
         `;
-
         const values = [childId];
-        if (parentId) {
-            query += ' AND c.parent_id = $2';
-            values.push(parentId);
+    
+        // Ensure parentId is a number (or a string parsable to a number) and not an object
+        if (parentId !== null && typeof parentId !== 'object') {
+            const numericParentId = parseInt(parentId, 10);
+            if (!isNaN(numericParentId)) {
+                query += ' AND c.parent_id = $2';
+                values.push(numericParentId);
+            } else {
+                console.warn(`Child.findById: parentId was provided but was not a valid number: ${parentId}`);
+            }
         }
-
+    
         try {
-            // Using pool directly for the query instead of a client
-            const { rows } = await pool.query(query, values);
+            const { rows } = await dbClient.query(query, values); // Use dbClient
             return rows[0] || null;
         } catch (error) {
-            throw new Error(`Error finding child: ${error.message}`);
+            // More detailed error logging
+            console.error(
+                `Error in Child.findById. ChildId: ${childId} (type: ${typeof childId}), ` +
+                `ParentId: ${parentId} (type: ${typeof parentId}). ` +
+                `Query: ${query}, Values: ${JSON.stringify(values)}. Error: ${error.message}`
+            );
+            // Re-throw with a more specific message if needed, or just the original error.
+            throw new Error(`Error finding child (ID: ${childId}): ${error.message}`);
         }
     }
 
