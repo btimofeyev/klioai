@@ -55,14 +55,14 @@ const parentalControlController = {
         try {
             const childId = req.params.childId;
             console.log("Updating controls for childId:", childId);
-            
+
             if (!childId) {
                 return res.status(400).json({
                     success: false,
                     message: 'Child ID is required'
                 });
             }
-            
+
             const parentId = req.user.id;
             const {
                 filterInappropriate,
@@ -71,44 +71,63 @@ const parentalControlController = {
                 allowedHours
             } = req.body;
 
+            // Log the received body for clarity
+            console.log("Received updateControls body:", JSON.stringify(req.body, null, 2));
+
+
             const messageLimitNum = parseInt(messageLimit, 10);
             if (!VALID_MESSAGE_LIMITS.includes(messageLimitNum)) {
+                console.error(`Invalid messageLimit from body: ${messageLimit}, parsed as ${messageLimitNum}. Valid limits: ${VALID_MESSAGE_LIMITS.join(', ')}`);
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid message limit value'
+                    message: 'Invalid message limit value. Must be one of: ' + VALID_MESSAGE_LIMITS.join(', ')
                 });
             }
 
-            // Default time values if not provided
-            const startTime = (allowedHours?.start || '').trim() || '09:00';
-            const endTime = (allowedHours?.end || '').trim() || '21:00';
-            
-            // Validate time format
-            const timeFormatRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            const rawStartTime = allowedHours?.start;
+            const rawEndTime = allowedHours?.end;
+
+            console.log(`Raw times from body: Start='${rawStartTime}', End='${rawEndTime}'`);
+
+            // Default time values if not provided or if they are empty strings after trim
+            const startTime = (rawStartTime && rawStartTime.trim() !== '') ? rawStartTime.trim() : '09:00';
+            const endTime = (rawEndTime && rawEndTime.trim() !== '') ? rawEndTime.trim() : '21:00';
+
+            console.log(`Processed times for validation: Start='${startTime}', End='${endTime}'`);
+
+            // Validate time format (HH:MM or HH:MM:SS)
+            const timeFormatRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
             if (!timeFormatRegex.test(startTime) || !timeFormatRegex.test(endTime)) {
+                console.error(`Time format validation failed. Regex: ${timeFormatRegex}. Test Start ('${startTime}'): ${timeFormatRegex.test(startTime)}, Test End ('${endTime}'): ${timeFormatRegex.test(endTime)}`);
                 return res.status(400).json({
                     success: false,
-                    message: 'Invalid time format. Use HH:MM format.'
+                    message: 'Invalid time format. Use HH:MM or HH:MM:SS format.'
                 });
             }
 
             const child = await Child.findById(childId, parentId);
             if (!child) {
+                console.error(`Child not found for childId: ${childId} with parentId: ${parentId}`);
                 return res.status(404).json({
                     success: false,
-                    message: 'Child not found'
+                    message: 'Child not found or parent does not have access.'
                 });
             }
 
-            const updatedControls = await ParentalControl.update(childId, {
+            const controlsToUpdate = {
                 filterInappropriate: !!filterInappropriate,
                 blockPersonalInfo: !!blockPersonalInfo,
                 messageLimit: messageLimitNum,
                 allowedHours: {
-                    start: startTime,
-                    end: endTime
+                    start: startTime, // Use the validated time string
+                    end: endTime     // Use the validated time string
                 }
-            });
+            };
+            console.log("Calling ParentalControl.update with data:", JSON.stringify(controlsToUpdate, null, 2));
+
+            const updatedControls = await ParentalControl.update(childId, controlsToUpdate);
+            
+            console.log("ParentalControl.update successful. Result:", JSON.stringify(updatedControls, null, 2));
 
             res.json({
                 success: true,
@@ -124,10 +143,10 @@ const parentalControlController = {
                 }
             });
         } catch (error) {
-            console.error('Error updating controls:', error);
+            console.error('Error in updateControls controller:', error.message, error.stack);
             res.status(500).json({
                 success: false,
-                message: error.message || 'Failed to update controls'
+                message: error.message || 'Failed to update controls due to an unexpected server error.'
             });
         }
     },
