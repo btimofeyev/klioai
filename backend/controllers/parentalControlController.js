@@ -7,7 +7,16 @@ const VALID_MESSAGE_LIMITS = [50, 100, 200, 999999]; // Include 999999 for unlim
 const parentalControlController = {
     async getControls(req, res) {
         try {
-            const { childId } = req.params;
+            const childId = req.params.childId;
+            console.log("Getting controls for childId:", childId);
+            
+            if (!childId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Child ID is required'
+                });
+            }
+            
             const parentId = req.user.id;
 
             const child = await Child.findById(childId, parentId);
@@ -30,7 +39,7 @@ const parentalControlController = {
                         start: controls.allowed_start_time,
                         end: controls.allowed_end_time
                     },
-                    blockedTopics: controls.blocked_topics
+                    blockedTopics: controls.blocked_topics || []
                 }
             });
         } catch (error) {
@@ -44,7 +53,16 @@ const parentalControlController = {
 
     async updateControls(req, res) {
         try {
-            const { childId } = req.params;
+            const childId = req.params.childId;
+            console.log("Updating controls for childId:", childId);
+            
+            if (!childId) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Child ID is required'
+                });
+            }
+            
             const parentId = req.user.id;
             const {
                 filterInappropriate,
@@ -61,10 +79,16 @@ const parentalControlController = {
                 });
             }
 
-            if (!allowedHours?.start || !allowedHours?.end) {
+            // Default time values if not provided
+            const startTime = (allowedHours?.start || '').trim() || '09:00';
+            const endTime = (allowedHours?.end || '').trim() || '21:00';
+            
+            // Validate time format
+            const timeFormatRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            if (!timeFormatRegex.test(startTime) || !timeFormatRegex.test(endTime)) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Both start and end times are required'
+                    message: 'Invalid time format. Use HH:MM format.'
                 });
             }
 
@@ -81,8 +105,8 @@ const parentalControlController = {
                 blockPersonalInfo: !!blockPersonalInfo,
                 messageLimit: messageLimitNum,
                 allowedHours: {
-                    start: allowedHours.start,
-                    end: allowedHours.end
+                    start: startTime,
+                    end: endTime
                 }
             });
 

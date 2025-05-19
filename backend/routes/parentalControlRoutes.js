@@ -15,9 +15,9 @@ router.use((req, res, next) => {
 // Apply authentication middleware to all routes
 router.use(verifyToken);
 
+// Ensure route parameters are properly defined
 router.get('/children/:childId/controls', parentalControlController.getControls);
 router.put('/children/:childId/controls', parentalControlController.updateControls);
 router.get('/children/:childId/access', parentalControlController.checkAccess);
-
 
 module.exports = router;

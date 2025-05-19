@@ -164,8 +164,7 @@ class Child {
             SELECT 
                 c.*,
                 pc.message_limit,
-                pc.allowed_start_time,
-                pc.allowed_end_time
+                pc.allowed_start_time, pc.allowed_end_time
             FROM children c
             LEFT JOIN parental_controls pc ON c.id = pc.child_id
             WHERE c.parent_id = $1
@@ -180,11 +179,32 @@ class Child {
         }
     }
 
-    static async findById(childId, client = null) {
-        const queryClient = client || pool;
-        const { rows } = await queryClient.query('SELECT * FROM children WHERE id = $1', [childId]);
-        return rows.length ? rows[0] : null;
-      }
+    static async findById(childId, parentId = null) {
+        let query = `
+            SELECT 
+                c.*,
+                pc.message_limit,
+                pc.allowed_start_time,
+                pc.allowed_end_time
+            FROM children c
+            LEFT JOIN parental_controls pc ON c.id = pc.child_id
+            WHERE c.id = $1
+        `;
+
+        const values = [childId];
+        if (parentId) {
+            query += ' AND c.parent_id = $2';
+            values.push(parentId);
+        }
+
+        try {
+            // Using pool directly for the query instead of a client
+            const { rows } = await pool.query(query, values);
+            return rows[0] || null;
+        } catch (error) {
+            throw new Error(`Error finding child: ${error.message}`);
+        }
+    }
 
     static async update(id, data, parentId) {
         const { name, age, username } = data;
